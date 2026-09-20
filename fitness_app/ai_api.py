@@ -43,15 +43,17 @@ def generate_user_advice(self, profile, card_id, period, user_plans):
         # Yangi GenAI mijozi
         client = genai.Client(api_key=api_key)
 
-        # Yangi SDK uslubida JSON format talab qilish va so'rov yuborish
         response = client.models.generate_content(
-            model="gemini-2.5-flash",
+            model="gemini-3.6-flash",
             contents=prompt,
             config=types.GenerateContentConfig(
                 response_mime_type="application/json",
                 temperature=0.5,
             ),
         )
+
+        advice_json = json.loads(response.text)
+        return advice_json
 
         advice_json = json.loads(response.text)
         return advice_json
