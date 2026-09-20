@@ -45,7 +45,7 @@ httpx==0.28.1
 idna==3.18
 magic-filter==1.0.12
 multidict==6.7.1
-ngrok==1.7.0
+ngrok>=1.4.0
 pillow==12.3.0
 propcache==0.5.2
 proto-plus==1.28.2
