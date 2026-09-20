@@ -39,7 +39,6 @@ def generate_user_advice(self, profile, card_id, period, user_plans):
     """
 
     try:
-        # Yangi google-genai mijozi
         client = genai.Client(api_key=api_key)
 
         response = client.models.generate_content(
