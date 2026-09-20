@@ -156,6 +156,7 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 CSRF_COOKIE_HTTPONLY = False
 SESSION_COOKIE_SAMESITE = 'Lax'
 CSRF_COOKIE_SAMESITE = 'Lax'
+
 BOT_TOKEN = config('BOT_TOKEN', default='dummy-bot-token-for-ci')
 ALLOWED_HOSTS = ['*']
 # ALLOWED_HOSTS = [
@@ -182,3 +183,11 @@ DATABASES = {
         conn_max_age=600
     )
 }
+CSRF_TRUSTED_ORIGINS = [
+    'http://127.0.0.1:8000',
+    'http://localhost:8000',
+]
+
+CSRF_COOKIE_SECURE = False
+SESSION_COOKIE_SECURE = False
+CSRF_COOKIE_HTTPONLY = False

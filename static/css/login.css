@@ -1,0 +1,180 @@
+.auth-card {
+    background: var(--card-bg, #1a2332);
+    border: 1px solid var(--border-color, #2d3748);
+    padding: 40px 30px;
+    border-radius: 20px;
+    width: 100%;
+    max-width: 440px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+}
+
+.tab-header {
+    display: flex;
+    background: rgba(0,0,0,0.2);
+    border-radius: 12px;
+    padding: 4px;
+    margin-bottom: 25px;
+    border: 1px solid var(--border-color, #2d3748);
+}
+
+.tab-btn {
+    flex: 1;
+    padding: 10px;
+    border: none;
+    background: transparent;
+    color: #94a3b8;
+    font-weight: 600;
+    font-size: 0.95rem;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.tab-btn.active {
+    background: #2d3748;
+    color: #ffffff;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+
+.auth-title {
+    font-size: 1.8rem;
+    font-weight: 800;
+    color: #ffffff;
+    text-align: center;
+    margin-bottom: 6px;
+}
+
+.auth-subtitle {
+    font-size: 0.9rem;
+    color: #94a3b8;
+    text-align: center;
+    margin-bottom: 25px;
+}
+
+.form-group {
+    margin-bottom: 18px;
+}
+
+.form-group label {
+    display: block;
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: #f1f5f9 !important;
+    margin-bottom: 8px;
+    letter-spacing: 0.3px;
+}
+
+.password-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.form-input {
+    width: 100%;
+    padding: 13px 42px 13px 16px;
+    background: rgba(15, 23, 42, 0.6);
+    border: 1px solid #334155;
+    border-radius: 10px;
+    color: #ffffff;
+    font-size: 0.95rem;
+    outline: none;
+    transition: border-color 0.2s;
+    box-sizing: border-box;
+}
+
+.form-input::placeholder {
+    color: #64748b;
+}
+
+.form-input:focus {
+    border-color: #00b894;
+}
+
+.toggle-password {
+    position: absolute;
+    right: 12px;
+    cursor: pointer;
+    font-size: 1.2rem;
+    user-select: none;
+    opacity: 0.7;
+    transition: opacity 0.2s;
+}
+
+.toggle-password:hover {
+    opacity: 1;
+}
+
+/* Parol shartlari uchun indicator stillari */
+.password-requirements {
+    margin-top: 10px;
+    padding: 10px 12px;
+    background: rgba(15, 23, 42, 0.4);
+    border-radius: 8px;
+    border: 1px solid #334155;
+}
+
+.req-item {
+    font-size: 0.82rem;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    transition: color 0.2s;
+}
+
+.req-item:last-child {
+    margin-bottom: 0;
+}
+
+.req-item.invalid {
+    color: #94a3b8;
+}
+
+.req-item.valid {
+    color: #00b894;
+    font-weight: 600;
+}
+
+.req-item.invalid .req-icon {
+    color: #ff4b5a;
+}
+
+.req-item.valid .req-icon {
+    color: #00b894;
+}
+
+.submit-btn {
+    width: 100%;
+    padding: 14px;
+    background: #00b894;
+    color: #ffffff;
+    border: none;
+    border-radius: 12px;
+    font-weight: bold;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.1s;
+}
+
+.submit-btn:hover {
+    background: #00a383;
+}
+
+.submit-btn:active {
+    transform: scale(0.99);
+}
+
+.back-btn {
+    display: block;
+    width: 100%;
+    text-align: center;
+    padding: 12px;
+    background: rgba(15, 23, 42, 0.6);
+    color: #ffffff;
+    border: 1px solid #334155;
+    border-radius: 12px;
+    font-weight: 600;
+    font-size: 0.9rem;
+    text-decoration: none;
+}

@@ -3,6 +3,11 @@
 
 {% block title %}Tizimga kirish | Life GYM{% endblock %}
 
+{% block extra_css %}
+<!-- CSS fayl ulash -->
+<link rel="stylesheet" href="{% static 'css/login.css' %}">
+{% endblock %}
+
 {% block content %}
 <div style="min-height: 80vh; display: flex; align-items: center; justify-content: center; padding: 20px 0;">
     <div class="auth-card">
@@ -16,7 +21,7 @@
         <h2 id="form-title" class="auth-title">Tizimga kirish</h2>
         <p id="form-subtitle" class="auth-subtitle">Ma'lumotlaringizni to'g'ri kiriting</p>
 
-        <!-- Xatolik bo'lsa qizil fonda xabar chiqaradi -->
+        <!-- Xatolik xabarlari -->
         {% if messages %}
             {% for message in messages %}
             <div style="background-color: rgba(255, 75, 90, 0.15); border: 1px solid #ff4b5a; color: #ff4b5a; padding: 10px 15px; border-radius: 10px; margin-bottom: 20px; font-size: 0.9rem; text-align: center;">
@@ -29,28 +34,41 @@
             {% csrf_token %}
             <input type="hidden" name="action_type" id="action_type" value="login">
 
-            <!-- Username (Doim ko'rinadi) -->
+            <!-- Username -->
             <div class="form-group">
                 <label>Username (Login)</label>
                 <input type="text" name="username" placeholder="Name" required class="form-input">
             </div>
 
-            <!-- Telefon raqam -->
+            <!-- Telefon raqam (Maska bilan) -->
             <div class="form-group" id="phone-group" style="display: none;">
                 <label>Telefon raqam</label>
-                <input type="tel" name="phone" placeholder="+998 -- --- -- --" class="form-input">
+                <input type="tel" name="phone" id="phone_input" placeholder="+998 90-123-45-67" class="form-input" oninput="formatPhoneNumber(this)" maxlength="17">
             </div>
 
-            <!-- Parol (Ko'zcha ko'rsatkich bilan) -->
+            <!-- Parol -->
             <div class="form-group">
                 <label id="pass-label">Parol</label>
                 <div class="password-wrapper">
-                    <input type="password" id="password" name="password" placeholder="••••••••" required class="form-input">
+                    <input type="password" id="password" name="password" placeholder="••••••••" required class="form-input" oninput="checkPasswordStrength()">
                     <span class="toggle-password" onclick="togglePasswordVisibility('password', this)">👁️</span>
+                </div>
+
+                <!-- Dinamik parol tekshiruvi -->
+                <div id="password-requirements" class="password-requirements" style="display: none;">
+                    <div id="req-length" class="req-item invalid">
+                        <span class="req-icon">✖</span> Kamida 8 ta belgi
+                    </div>
+                    <div id="req-uppercase" class="req-item invalid">
+                        <span class="req-icon">✖</span> Kamida 1 ta katta harf (A-Z)
+                    </div>
+                    <div id="req-lowercase" class="req-item invalid">
+                        <span class="req-icon">✖</span> Kamida 1 ta kichik harf (a-z)
+                    </div>
                 </div>
             </div>
 
-            <!-- Parolni qayta kiritish (Ko'zcha ko'rsatkich bilan) -->
+            <!-- Parolni qayta kiritish -->
             <div class="form-group" id="confirm-pass-group" style="display: none;">
                 <label>Parolni qayta kiritish (Tasdiqlash)</label>
                 <div class="password-wrapper">
@@ -78,218 +96,9 @@
 
     </div>
 </div>
+{% endblock %}
 
-<style>
-    .auth-card {
-        background: var(--card-bg, #1a2332);
-        border: 1px solid var(--border-color, #2d3748);
-        padding: 40px 30px;
-        border-radius: 20px;
-        width: 100%;
-        max-width: 440px;
-        box-shadow: 0 10px 30px rgba(0,0,0,0.3);
-    }
-
-    .tab-header {
-        display: flex;
-        background: rgba(0,0,0,0.2);
-        border-radius: 12px;
-        padding: 4px;
-        margin-bottom: 25px;
-        border: 1px solid var(--border-color, #2d3748);
-    }
-
-    .tab-btn {
-        flex: 1;
-        padding: 10px;
-        border: none;
-        background: transparent;
-        color: #94a3b8;
-        font-weight: 600;
-        font-size: 0.95rem;
-        border-radius: 8px;
-        cursor: pointer;
-        transition: all 0.3s;
-    }
-
-    .tab-btn.active {
-        background: #2d3748;
-        color: #ffffff;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.2);
-    }
-
-    .auth-title {
-        font-size: 1.8rem;
-        font-weight: 800;
-        color: #ffffff;
-        text-align: center;
-        margin-bottom: 6px;
-    }
-
-    .auth-subtitle {
-        font-size: 0.9rem;
-        color: #94a3b8;
-        text-align: center;
-        margin-bottom: 25px;
-    }
-
-    .form-group {
-        margin-bottom: 18px;
-    }
-
-    /* Input ustidagi sarlovha matnlari ancha yorqin va ko'rinadigan qilindi */
-    .form-group label {
-        display: block;
-        font-size: 0.9rem;
-        font-weight: 700;
-        color: #f1f5f9 !important; /* To'liq aniq ko'rinadigan rang */
-        margin-bottom: 8px;
-        letter-spacing: 0.3px;
-    }
-
-    /* Parol input va ko'zcha uchun konteyner */
-    .password-wrapper {
-        position: relative;
-        display: flex;
-        align-items: center;
-    }
-
-    .form-input {
-        width: 100%;
-        padding: 13px 42px 13px 16px;
-        background: rgba(15, 23, 42, 0.6);
-        border: 1px solid #334155;
-        border-radius: 10px;
-        color: #ffffff;
-        font-size: 0.95rem;
-        outline: none;
-        transition: border-color 0.2s;
-        box-sizing: border-box;
-    }
-
-    .form-input::placeholder {
-        color: #64748b;
-    }
-
-    .form-input:focus {
-        border-color: #00b894;
-    }
-
-    /* Ko'zcha belgisi stillari */
-    .toggle-password {
-        position: absolute;
-        right: 12px;
-        cursor: pointer;
-        font-size: 1.2rem;
-        user-select: none;
-        opacity: 0.7;
-        transition: opacity 0.2s;
-    }
-
-    .toggle-password:hover {
-        opacity: 1;
-    }
-
-    .submit-btn {
-        width: 100%;
-        padding: 14px;
-        background: #00b894;
-        color: #ffffff;
-        border: none;
-        border-radius: 12px;
-        font-weight: bold;
-        font-size: 1rem;
-        cursor: pointer;
-        transition: background 0.2s, transform 0.1s;
-    }
-
-    .submit-btn:hover {
-        background: #00a383;
-    }
-
-    .submit-btn:active {
-        transform: scale(0.99);
-    }
-
-    .back-btn {
-        display: block;
-        width: 100%;
-        text-align: center;
-        padding: 12px;
-        background: rgba(15, 23, 42, 0.6);
-        color: #ffffff;
-        border: 1px solid #334155;
-        border-radius: 12px;
-        font-weight: 600;
-        font-size: 0.9rem;
-        text-decoration: none;
-    }
-</style>
-
-<script>
-    /* Parolni ko'rsatish/yashirish funksiyasi */
-    function togglePasswordVisibility(inputId, icon) {
-        const input = document.getElementById(inputId);
-        if (input.type === 'password') {
-            input.type = 'text';
-            icon.textContent = '🙈'; // Yashirish belgisi
-        } else {
-            input.type = 'password';
-            icon.textContent = '👁️'; // Ko'rsatish belgisi
-        }
-    }
-
-    function switchTab(mode) {
-        const phoneGroup = document.getElementById('phone-group');
-        const confirmPassGroup = document.getElementById('confirm-pass-group');
-        const forgotBox = document.getElementById('forgot-link-box');
-        const title = document.getElementById('form-title');
-        const subtitle = document.getElementById('form-subtitle');
-        const submitBtn = document.getElementById('submit-btn');
-        const actionType = document.getElementById('action_type');
-
-        const tabLogin = document.getElementById('tab-login');
-        const tabRegister = document.getElementById('tab-register');
-
-        if (mode === 'login') {
-            phoneGroup.style.display = 'none';
-            confirmPassGroup.style.display = 'none';
-            forgotBox.style.display = 'block';
-
-            title.textContent = "Tizimga kirish";
-            subtitle.textContent = "Ma'lumotlaringizni to'g'ri kiriting";
-            submitBtn.textContent = "Tizimga kirish";
-            actionType.value = "login";
-
-            tabLogin.classList.add('active');
-            tabRegister.classList.remove('active');
-
-        } else if (mode === 'register') {
-            phoneGroup.style.display = 'block';
-            confirmPassGroup.style.display = 'block';
-            forgotBox.style.display = 'none';
-
-            title.textContent = "Ro'yxatdan o'tish";
-            subtitle.textContent = "Yangi hisob yaratish uchun to'ldiring";
-            submitBtn.textContent = "Ro'yxatdan o'tish";
-            actionType.value = "register";
-
-            tabRegister.classList.add('active');
-            tabLogin.classList.remove('active');
-
-        } else if (mode === 'reset') {
-            phoneGroup.style.display = 'block';
-            confirmPassGroup.style.display = 'block';
-            forgotBox.style.display = 'none';
-
-            title.textContent = "Parolni tiklash";
-            subtitle.textContent = "Telefon va yangi parolni kiriting";
-            submitBtn.textContent = "Parolni yangilash";
-            actionType.value = "reset";
-
-            tabLogin.classList.remove('active');
-            tabRegister.classList.remove('active');
-        }
-    }
-</script>
+{% block extra_js %}
+<!-- JS fayl ulash -->
+<script src="{% static 'js/login.js' %}"></script>
 {% endblock %}

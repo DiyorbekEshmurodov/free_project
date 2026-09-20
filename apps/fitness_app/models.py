@@ -3,6 +3,7 @@ from apps.accounts.models import UserDetail
 from django.contrib.auth.models import User
 from django.db.models.signals import post_save
 from django.dispatch import receiver
+from django.core.exceptions import ObjectDoesNotExist
 
 class FitnessPlan(models.Model):
     PERIOD_CHOICES = (
@@ -29,8 +30,11 @@ def create_user_profile(sender, instance, created, **kwargs):
 
 @receiver(post_save, sender=User)
 def save_user_profile(sender, instance, **kwargs):
-    if hasattr(instance, 'profil'):
-        instance.profil.save()
+    try:
+        if hasattr(instance, 'profil'):
+            instance.profil.save()
+    except ObjectDoesNotExist:
+        pass
 
 
 

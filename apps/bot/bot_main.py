@@ -2,7 +2,7 @@ from aiogram import Bot, Dispatcher ,Router,types
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardRemove,ReplyKeyboardMarkup,KeyboardButton
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
-from accounts.models import UserDetail
+from apps.accounts.models import UserDetail
 from django.contrib.auth.models import User
 from . import globals
 from .states import LoginStates
@@ -86,10 +86,16 @@ async def process_username(message: types.Message, state: FSMContext):
 @main_router.message(LoginStates.password)
 async def process_password(message: types.Message, state: FSMContext):
     password = message.text.strip()
-    if len(password) < 4:
-        await message.answer("Parol juda qisqa! Kamida 4 ta belgidan iborat parol kiriting:")
+    has_upper = any(char.isupper() for char in password)
+    has_lower = any(char.islower() for char in password)
+    if len(password) < 8 or not has_upper or not has_lower:
+        await message.answer(
+            "❌ **Parol talablarga javob bermaydi!**\n\n"
+            "Parol kamida 8 ta belgidan iborat bo'lishi, hamda kamida 1 ta katta harf (A-Z) va 1 ta kichik harf (a-z) qatnashishi kerak.\n\n"
+            "Iltimos, qaytadan boshqa parol kiriting:",
+            parse_mode="Markdown"
+        )
         return
-
     data = await state.get_data()
     telegram_id = message.from_user.id
     username_input = data.get('username')

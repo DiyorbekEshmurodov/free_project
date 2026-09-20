@@ -91,10 +91,16 @@ def login_page(request):
             else :
                 return render(request,'accounts/login.html',{'error':'Username yoki parol xato kiritilgan\nQaytadan kiriting 😁 '})
 
+
         elif action_type == 'register':
-            confirm_password = request.POST.get('confirm_password')
+
+            has_upper = any(char.isupper() for char in password)
+            has_lower = any(char.islower() for char in password)
             if password != confirm_password:
-                messages.error(request,'Parollar bir hil emas')
+                messages.error(request, 'Parollar bir xil emas!')
+            elif len(password) < 8 or not has_upper or not has_lower:
+                messages.error(request,
+                'Parol kamida 8 ta belgi, 1 ta katta va 1 ta kichik harfdan iborat bo\'lishi kerak!')
             elif User.objects.filter(username=username).exists():
                     messages.error(request,'Bunday Foydalanuvchi alloqachon mavjud!')
             else:
@@ -107,6 +113,13 @@ def login_page(request):
             confirm_password = request.POST.get('confirm_password')
             try :
                 user = User.objects.get(username=username)
+                has_upper = any(char.isupper() for char in password)
+                has_lower = any(char.islower() for char in password)
+                if password != confirm_password:
+                    messages.error(request, 'Parollar bir xil emas!')
+                elif len(password) < 8 or not has_upper or not has_lower:
+                    messages.error(request,
+                    "Yangi parol kamida 8 ta belgi, 1 ta katta va 1 ta kichik harfdan iborat bo'lishi kerak!")
                 if password == confirm_password:
                     user.set_password(password)
                     user.save()
