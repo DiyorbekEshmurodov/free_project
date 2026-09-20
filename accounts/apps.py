@@ -2,7 +2,6 @@ import os
 import sys
 import threading
 import asyncio
-import subprocess
 from django.apps import AppConfig
 
 
@@ -16,17 +15,6 @@ class AccountsConfig(AppConfig):
             thread.start()
 
     def run_bot_thread(self):
-        # Lokal uchun Ngrok
-        if os.environ.get('RUN_MAIN') == 'true' and not os.environ.get('RENDER'):
-            def start_ngrok():
-                subprocess.Popen(
-                    ["ngrok", "http", "8000"],
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL
-                )
-
-            threading.Thread(target=start_ngrok, daemon=True).start()
-
         # Alohida thread uchun event loop yaratish
         try:
             print("--- TELEGRAM BOT ISHGA TUSHMOQDA ---", flush=True)
