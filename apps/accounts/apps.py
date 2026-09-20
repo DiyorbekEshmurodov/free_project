@@ -7,7 +7,7 @@ from django.apps import AppConfig
 
 class AccountsConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
-    name = 'accounts'
+    name = 'apps.accounts'
 
     def ready(self):
         if os.environ.get('RENDER') or os.environ.get('RUN_MAIN') == 'true' or os.environ.get('SERVER_SOFTWARE'):

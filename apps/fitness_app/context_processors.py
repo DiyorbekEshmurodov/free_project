@@ -1,5 +1,5 @@
 def user_profile_status(request):
-    from accounts.models import UserDetail
+    from apps.accounts.models import UserDetail
     has_profile = False
     if request.user.is_authenticated:
         # Foydalanuvchida UserDetail mavjudligi va to'ldirilganini tekshirish

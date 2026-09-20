@@ -4,8 +4,8 @@ from django.urls import reverse
 from rest_framework.test import APIClient
 from rest_framework import status
 from unittest.mock import patch
-from fitness_app.models import FitnessPlan
-from accounts.models import UserDetail
+from apps.fitness_app.models import FitnessPlan
+from apps.accounts.models import UserDetail
 from datetime import date
 
 User = get_user_model()

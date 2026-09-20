@@ -1,6 +1,6 @@
 from django.urls import path
 from .views import *
-from accounts.views import main_account
+from apps.accounts.views import main_account
 
 urlpatterns = [
     path('',user_plan,name='user_plan'),

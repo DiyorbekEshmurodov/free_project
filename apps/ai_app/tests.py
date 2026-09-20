@@ -1,10 +1,10 @@
 from django.test import TestCase , Client
 from django.contrib.auth import get_user_model
-from accounts.models import UserDetail
+from apps.accounts.models import UserDetail
 from django.urls import reverse
 from unittest.mock import patch
-from ai_app.models import UserQuestion
-from ai_app.prompts import SECTION_MAP
+from apps.ai_app.models import UserQuestion
+from apps.ai_app.prompts import SECTION_MAP
 
 User = get_user_model()
 

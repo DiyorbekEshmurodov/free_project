@@ -4,7 +4,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.decorators import login_required
 from .models import FitnessPlan
 from .forms import FitnessPlanForm
-from accounts.models import UserDetail
+from apps.accounts.models import UserDetail
 
 
 @login_required

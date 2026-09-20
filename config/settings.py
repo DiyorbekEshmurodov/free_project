@@ -12,11 +12,13 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 
 from pathlib import Path
 import os
+import sys
 import dotenv
 from decouple import config
 import dj_database_url
-# 1. Avval BASE_DIR aniqlanadi
 BASE_DIR = Path(__file__).resolve().parent.parent
+# 1. Avval BASE_DIR aniqlanadi
+sys.path.insert(0, os.path.join(BASE_DIR, 'apps'))
 
 # 2. Keyin .env fayl yuklanadi va kalit olinadi
 dotenv.load_dotenv(BASE_DIR / '.env')
@@ -47,10 +49,10 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'django_ngrok',
 
-    'accounts',
-    'fitness_app',
-    'ai_app',
-    'bot',
+    'apps.accounts',
+    'apps.ai_app',
+    'apps.bot',
+    'apps.fitness_app',
 ]
 
 MIDDLEWARE = [

@@ -2,7 +2,7 @@ from django.shortcuts import render
 from .services import ai_handler
 from .models import UserQuestion
 from .prompts import SECTION_MAP
-from accounts.models import UserDetail
+from apps.accounts.models import UserDetail
 # 1. BARCHA KARTALAR RO'YXATI UCHUN UNIVERSAL VIEW
 def cards_list_view(request, section_name):
     section_data = SECTION_MAP.get(section_name)
