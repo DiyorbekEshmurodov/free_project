@@ -13,7 +13,7 @@ def ai_handler(prompt_text):
         client = genai.Client(api_key=api_key)
 
         response = client.models.generate_content(
-            model="gemini-2.5-flash",
+            model="gemini-3.6-flash",
             contents=prompt_text,
             config={
                 "system_instruction": "Siz professional diyetolog va shaxsiy fitnes trenergiz. Javoblaringizni o'zbek tilida bering."
