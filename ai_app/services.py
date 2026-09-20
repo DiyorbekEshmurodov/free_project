@@ -14,7 +14,7 @@ def ai_handler(prompt_text):
 
         # AI modelini yaratish va tizim ko'rsatmasini (system instruction) berish
         model = genai.GenerativeModel(
-            model_name="gemini-2.5-flash",
+            model_name="gemini-3.6-flash",
             system_instruction="Siz professional diyetolog va shaxsiy fitnes trenergiz. Javoblaringizni o'zbek tilida, tushunarli va chiroyli formatda bering."
         )
 
