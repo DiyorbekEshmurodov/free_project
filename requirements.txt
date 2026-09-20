@@ -14,6 +14,7 @@ charset-normalizer==3.4.9
 colorama==0.4.6
 cryptography==50.0.0
 distro==1.9.0
+dj-database-url==3.1.2
 Django==5.2.17
 django-cors-headers==4.9.0
 django-ngrok==0.1.0
