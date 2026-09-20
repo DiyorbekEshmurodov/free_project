@@ -15,7 +15,7 @@ async def main():
     dp.include_router(main_router)
 
     print("Bot muvaffaqiyatli ishga tushdi...")
-    await dp.start_polling(bot)
+    await dp.start_polling(bot,handle_signals=False)
 
 
 if __name__ == "__main__":

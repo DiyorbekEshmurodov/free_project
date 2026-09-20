@@ -1,17 +1,16 @@
 import os
 import sys
-import logging
 import threading
 import asyncio
 import subprocess
 from django.apps import AppConfig
+
 
 class AccountsConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
     name = 'accounts'
 
     def ready(self):
-        # Render'da yoki RUN_MAIN bo'lganda botni ishga tushirish
         if os.environ.get('RENDER') or os.environ.get('RUN_MAIN') == 'true' or os.environ.get('SERVER_SOFTWARE'):
             thread = threading.Thread(target=self.run_bot_thread, daemon=True)
             thread.start()
@@ -25,12 +24,16 @@ class AccountsConfig(AppConfig):
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL
                 )
+
             threading.Thread(target=start_ngrok, daemon=True).start()
 
-        # Botni ishga tushirish va xatolikni konsolga chiqarish
+        # Alohida thread uchun event loop yaratish
         try:
             print("--- TELEGRAM BOT ISHGA TUSHMOQDA ---", flush=True)
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+
             from run_bot import main
-            asyncio.run(main())
+            loop.run_until_complete(main())
         except Exception as e:
             print(f"--- BOTDA XATOLIK BO'LDI: {e} ---", file=sys.stderr, flush=True)
