@@ -1,6 +1,7 @@
 import json
 import os
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 from django.conf import settings
 
 
@@ -39,19 +40,19 @@ def generate_user_advice(self, profile, card_id, period, user_plans):
 
     try:
         # Gemini sozlanadi va JSON formatida javob talab qilinadi
-        genai.configure(api_key=api_key)
+        # Yangi GenAI mijozi
+        client = genai.Client(api_key=api_key)
 
-        generation_config = {
-            "response_mime_type": "application/json",
-            "temperature": 0.5,
-        }
-
-        model = genai.GenerativeModel(
-            model_name="gemini-3.6-flash",
-            generation_config=generation_config
+        # Yangi SDK uslubida JSON format talab qilish va so'rov yuborish
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+                temperature=0.5,
+            ),
         )
 
-        response = model.generate_content(prompt)
         advice_json = json.loads(response.text)
         return advice_json
 
