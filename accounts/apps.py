@@ -1,24 +1,23 @@
 import os
+import sys
+import logging
 import threading
 import asyncio
 import subprocess
 from django.apps import AppConfig
-
 
 class AccountsConfig(AppConfig):
     default_auto_field = 'django.db.models.BigAutoField'
     name = 'accounts'
 
     def ready(self):
-        # Render serverida yoki lokalda botni alohida thread'da yoqish
-        if os.environ.get('RUN_MAIN') == 'true' or os.environ.get('SERVER_SOFTWARE') or os.environ.get('RENDER'):
+        # Render'da yoki RUN_MAIN bo'lganda botni ishga tushirish
+        if os.environ.get('RENDER') or os.environ.get('RUN_MAIN') == 'true' or os.environ.get('SERVER_SOFTWARE'):
             thread = threading.Thread(target=self.run_bot_thread, daemon=True)
             thread.start()
 
     def run_bot_thread(self):
-        from run_bot import main
-
-        # Ngrok faqat kompyuteringizda (lokal) ishlatilganda yonadi
+        # Lokal uchun Ngrok
         if os.environ.get('RUN_MAIN') == 'true' and not os.environ.get('RENDER'):
             def start_ngrok():
                 subprocess.Popen(
@@ -28,8 +27,10 @@ class AccountsConfig(AppConfig):
                 )
             threading.Thread(target=start_ngrok, daemon=True).start()
 
-        # Telegram botni ishga tushirish
+        # Botni ishga tushirish va xatolikni konsolga chiqarish
         try:
+            print("--- TELEGRAM BOT ISHGA TUSHMOQDA ---", flush=True)
+            from run_bot import main
             asyncio.run(main())
         except Exception as e:
-            print(f"Botda xatolik: {e}")
+            print(f"--- BOTDA XATOLIK BO'LDI: {e} ---", file=sys.stderr, flush=True)
