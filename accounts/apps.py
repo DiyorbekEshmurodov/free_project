@@ -10,19 +10,16 @@ class AccountsConfig(AppConfig):
     name = 'accounts'
 
     def ready(self):
-        # 1. Kompyuteringizda ishga tushganda (python manage.py runserver)
-        if os.environ.get('RUN_MAIN') == 'true':
-            self.start_background_tasks(run_ngrok=True)
+        # Render serverida yoki lokalda botni alohida thread'da yoqish
+        if os.environ.get('RUN_MAIN') == 'true' or os.environ.get('SERVER_SOFTWARE') or os.environ.get('RENDER'):
+            thread = threading.Thread(target=self.run_bot_thread, daemon=True)
+            thread.start()
 
-        # 2. Render serverida ishga tushganda (Gunicorn orqali)
-        elif os.environ.get('SERVER_SOFTWARE') or os.environ.get('RENDER'):
-            self.start_background_tasks(run_ngrok=False)
-
-    def start_background_tasks(self, run_ngrok=False):
+    def run_bot_thread(self):
         from run_bot import main
 
-        # Ngrok faqat kompyuteringizda lokal ishlatganda yonadi
-        if run_ngrok:
+        # Ngrok faqat kompyuteringizda (lokal) ishlatilganda yonadi
+        if os.environ.get('RUN_MAIN') == 'true' and not os.environ.get('RENDER'):
             def start_ngrok():
                 subprocess.Popen(
                     ["ngrok", "http", "8000"],
@@ -31,11 +28,8 @@ class AccountsConfig(AppConfig):
                 )
             threading.Thread(target=start_ngrok, daemon=True).start()
 
-        # Telegram bot kompyuterda ham, Render'da ham ishlaydi
-        def start_bot():
-            try:
-                asyncio.run(main())
-            except Exception as e:
-                print(f"Botda xatolik: {e}")
-
-        threading.Thread(target=start_bot, daemon=True).start()
+        # Telegram botni ishga tushirish
+        try:
+            asyncio.run(main())
+        except Exception as e:
+            print(f"Botda xatolik: {e}")

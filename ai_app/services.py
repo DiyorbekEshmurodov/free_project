@@ -1,4 +1,4 @@
-import google.generativeai as genai
+from google import genai
 from django.conf import settings
 
 def ai_handler(prompt_text):
