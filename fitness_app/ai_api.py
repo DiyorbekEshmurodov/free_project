@@ -39,18 +39,20 @@ def generate_user_advice(self, profile, card_id, period, user_plans):
     """
 
     try:
-        # Gemini sozlanadi va JSON formatida javob talab qilinadi
-        # Yangi GenAI mijozi
+        # Yangi google-genai mijozi
         client = genai.Client(api_key=api_key)
 
         response = client.models.generate_content(
-            model="gemini-3.6-flash",
+            model="gemini-2.5-flash",
             contents=prompt,
             config=types.GenerateContentConfig(
                 response_mime_type="application/json",
                 temperature=0.5,
             ),
         )
+
+        advice_json = json.loads(response.text)
+        return advice_json
 
         advice_json = json.loads(response.text)
         return advice_json
