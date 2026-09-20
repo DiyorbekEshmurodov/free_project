@@ -10,18 +10,32 @@ class AccountsConfig(AppConfig):
     name = 'accounts'
 
     def ready(self):
-        # Server qayta yuklanganda bot va ngrok 2 marta ishga tushmasligi uchun tekshiruv
+        # 1. Kompyuteringizda ishga tushganda (python manage.py runserver)
         if os.environ.get('RUN_MAIN') == 'true':
-            from run_bot import main
+            self.start_background_tasks(run_ngrok=True)
 
-            # 1. Ngrok-ni fonda ishga tushirish
+        # 2. Render serverida ishga tushganda (Gunicorn orqali)
+        elif os.environ.get('SERVER_SOFTWARE') or os.environ.get('RENDER'):
+            self.start_background_tasks(run_ngrok=False)
+
+    def start_background_tasks(self, run_ngrok=False):
+        from run_bot import main
+
+        # Ngrok faqat kompyuteringizda lokal ishlatganda yonadi
+        if run_ngrok:
             def start_ngrok():
-                subprocess.Popen(["ngrok", "http", "8000"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-
-            # 2. Botni ishga tushirish
-            def start_bot():
-                asyncio.run(main())
-
-            # Ikkala jarayonni ham alohida thread'larda yuritish
+                subprocess.Popen(
+                    ["ngrok", "http", "8000"],
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL
+                )
             threading.Thread(target=start_ngrok, daemon=True).start()
-            threading.Thread(target=start_bot, daemon=True).start()
+
+        # Telegram bot kompyuterda ham, Render'da ham ishlaydi
+        def start_bot():
+            try:
+                asyncio.run(main())
+            except Exception as e:
+                print(f"Botda xatolik: {e}")
+
+        threading.Thread(target=start_bot, daemon=True).start()
