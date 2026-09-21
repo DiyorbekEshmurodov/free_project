@@ -1,8 +1,7 @@
 import json
 import os
-# from google import genai
-# from google.genai import types
-from openai import OpenAI
+from google import genai
+from google.genai import types
 from django.conf import settings
 
 
@@ -40,34 +39,20 @@ def generate_user_advice(self, profile, card_id, period, user_plans):
     """
 
     try:
-        # client = genai.Client(api_key=api_key)
-        #
-        # response = client.models.generate_content(
-        #     model="gemini-3.6-flash",
-        #     contents=prompt,
-        #     config=types.GenerateContentConfig(
-        #         response_mime_type="application/json",
-        #         temperature=0.5,
-        #     ),
-        # )
-        #
-        # advice_json = json.loads(response.text)
-        # return advice_json
-        client = OpenAI(
-            base_url="https://openrouter.ai/api/v1",
-            api_key="SIZNING_OPENROUTER_API_KEYINGIZ",
+        client = genai.Client(api_key=api_key)
+
+        response = client.models.generate_content(
+            model="gemini-3.6-flash",
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+                temperature=0.5,
+            ),
         )
 
-        response = client.chat.completions.create(
-            # Bepul model nomi:
-            model="qwen/qwen-2.5-72b-instruct:free",
-            messages=[
-                {"role": "system", "content": "Siz foydali yordamchisiz."},
-                {"role": "user", "content": "Salom, OpenRouter haqida qisqacha aytib ber."}
-            ]
-        )
+        advice_json = json.loads(response.text)
+        return advice_json
 
-        print(response.choices[0].message.content)
 
 
 
