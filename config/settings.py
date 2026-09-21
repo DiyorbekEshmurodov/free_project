@@ -18,12 +18,14 @@ from decouple import config
 import dj_database_url
 import google.generativeai as genai
 BASE_DIR = Path(__file__).resolve().parent.parent
-# 1. Avval BASE_DIR aniqlanadi
+
 sys.path.insert(0, os.path.join(BASE_DIR, 'apps'))
 
-# 2. Keyin .env fayl yuklanadi va kalit olinadi
 dotenv.load_dotenv(BASE_DIR / '.env')
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+GEMINI_API_KEY = config("GEMINI_API_KEY", default=None)
+
+if GEMINI_API_KEY:
+    genai.configure(api_key=GEMINI_API_KEY)
 os.environ["DJANGO_ALLOW_ASYNC_UNSAFE"] = "true"
 
 
