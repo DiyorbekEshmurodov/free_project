@@ -60,7 +60,7 @@ def generate_user_advice(self, profile, card_id, period, user_plans):
 
         response = client.chat.completions.create(
             # Bepul model nomi:
-            model="google/gemma-2-9b-it:free",
+            model="qwen/qwen-2.5-72b-instruct:free",
             messages=[
                 {"role": "system", "content": "Siz foydali yordamchisiz."},
                 {"role": "user", "content": "Salom, OpenRouter haqida qisqacha aytib ber."}
