@@ -22,7 +22,7 @@ phone_keyboard = ReplyKeyboardMarkup(
 async def start(message: types.Message, state: FSMContext):
     await message.answer(globals.WELCOME_TEXT)
     user_telegram_id = message.from_user.id
-    site_url = f"https://free-project-3.onrender.com/auto-login/{user_telegram_id}/"
+    site_url = f"https://lifegym-kapp.onrender.com/auto-login/{user_telegram_id}/"
     user_detail = UserDetail.objects.filter(telegram_id=message.from_user.id).first()
 
     # AGAR USER MAVJUD BO'LSA - Shunchaki saytga havola beramiz
@@ -142,7 +142,7 @@ async def process_password(message: types.Message, state: FSMContext):
         user_detail.save()
 
         await state.clear()
-        site_url = f"https://free-project-3.onrender.com/auto-login/{telegram_id}/"
+        site_url = f"https://lifegym-kapp.onrender.com/auto-login/{telegram_id}/"
         buttons = InlineKeyboardMarkup(
             inline_keyboard=[[
                 InlineKeyboardButton(

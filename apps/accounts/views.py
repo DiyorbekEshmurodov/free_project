@@ -35,11 +35,10 @@ def dashboard_view(request):
 
 
 def auto_login_view(request, telegram_id):
-    # Telegram ID bo'yicha UserDetail ni qidiramiz
-    profil = UserDetail.objects.filter(telegram_id=telegram_id).first()  # yoki sizdagi telegram_user maydoni
+
+    profil = UserDetail.objects.filter(telegram_id=telegram_id).first()
 
     if profil and profil.user:
-        # Foydalanuvchini parolsiz avtomatik tizimga kirgizamiz (session yaratiladi)
         login(request, profil.user)
         return redirect('/ai_app/dashboard/')
     else:
