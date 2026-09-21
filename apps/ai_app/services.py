@@ -21,7 +21,7 @@ def ai_handler(prompt_text):
             # - google/gemini-2.5-flash:free
             # - meta-llama/llama-3.3-70b-instruct:free
             # - qwen/qwen-2.5-72b-instruct:free
-            model="meta-llama/llama-3.3-70b-instruct:free",
+            model="google/gemma-2-9b-it:free",
             messages=[
                 {
                     "role": "system",
