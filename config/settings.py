@@ -22,7 +22,7 @@ sys.path.insert(0, os.path.join(BASE_DIR, 'apps'))
 
 # 2. Keyin .env fayl yuklanadi va kalit olinadi
 dotenv.load_dotenv(BASE_DIR / '.env')
-GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
+OPENROUTER_API_KEY = os.getenv('OPENROUTER_API_KEY')
 os.environ["DJANGO_ALLOW_ASYNC_UNSAFE"] = "true"
 
 
