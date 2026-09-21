@@ -1,7 +1,7 @@
 import asyncio
 from aiogram import Bot, Dispatcher
 from django.conf import settings
-from bot.bot_main import main_router
+from apps.bot.bot_main import main_router
 
 
 async def main():
