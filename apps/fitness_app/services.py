@@ -6,7 +6,6 @@ def get_plans_by_period(user_id, period):
     qarab ma'lumotlarni filtrlab beradi.
     """
     try:
-        # UserDetail_id o'rniga Django'ning standart modeldagi user_id ishlatiladi
         plans = list(FitnessPlan.objects.filter(user_id=user_id, period_type=period).values())
         return plans if plans else False
     except Exception:

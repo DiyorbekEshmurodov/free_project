@@ -110,7 +110,6 @@ class AIPageDetailView(LoginRequiredMixin, TemplateView):
         selected_card = self.request.GET.get('card', 'weight_loss')
         selected_period = self.request.GET.get('period', 'weekly')
 
-        # Davr nomini o'zbekcha matnga o'girish
         period_titles = {
             'daily': 'Kunlik',
             'weekly': 'Haftalik',

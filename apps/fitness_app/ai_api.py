@@ -22,7 +22,7 @@ def generate_user_advice(self, profile, card_id, period, user_plans):
         }
 
     prompt = f"""
-        Siz professional fitness va ovqatlanish bo'yicha sun'iy intellekt murabbiyisiz.
+        Men(AI) professional fitness va ovqatlanish bo'yicha sun'iy intellekt murabbiyisiman.
         Foydalanuvchi ma'lumotlari:
         - Bo'yi: {buyi} cm
         - Vazni: {vazni} kg
@@ -30,7 +30,6 @@ def generate_user_advice(self, profile, card_id, period, user_plans):
         - Tanlangan yo'nalish (karta): {card_id}
         - Davriylik: {period}
 
-        Quyidagi JSON formatida FAQAT va FAQAT toza JSON javob qaytaring (hech qanday ortiqcha markdown va matnsiz):
         {{
             "nutrition": "Foydalanuvchining bo'yi, vazni va maqsadi uchun aniq kaloriya, oqsil hamda suv miqdori bo'yicha tavsiya",
             "workout": "Ushbu maqsad va davr uchun mos keladigan aniq mashqlar va ularning takrorlanishlar soni",
