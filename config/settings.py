@@ -16,16 +16,18 @@ import sys
 import dotenv
 from decouple import config
 import dj_database_url
-import google.generativeai as genai
+from groq import Groq
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 sys.path.insert(0, os.path.join(BASE_DIR, 'apps'))
 
 dotenv.load_dotenv(BASE_DIR / '.env')
-GEMINI_API_KEY = config("GEMINI_API_KEY", default=None)
+GROQ_API_KEY = config("GROQ_API_KEY", default=None)
 
-if GEMINI_API_KEY:
-    genai.configure(api_key=GEMINI_API_KEY)
+# Groq Client yaratamiz
+groq_client = None
+if GROQ_API_KEY:
+    groq_client = Groq(api_key=GROQ_API_KEY)
 os.environ["DJANGO_ALLOW_ASYNC_UNSAFE"] = "true"
 
 
