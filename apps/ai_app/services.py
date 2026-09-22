@@ -15,7 +15,7 @@ def ai_handler(prompt_text):
         # Groq API ga so'rov yuboramiz
         response = client.chat.completions.create(
             # Groq'da tavsiya etilgan eng kuchli va tezkor modellardan biri (Llama 3.3 70B):
-            model="llama-3.1-8b-instant",
+            model="openai/gpt-oss-120b",
             messages=[
                 {
                     "role": "system",
