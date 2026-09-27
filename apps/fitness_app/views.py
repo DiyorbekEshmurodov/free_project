@@ -2,10 +2,10 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.views.generic import TemplateView
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.decorators import login_required
+from django.views.decorators.http import require_POST
 from .models import FitnessPlan
 from .forms import FitnessPlanForm
 from apps.accounts.models import UserDetail
-
 
 @login_required
 def plan_list(request):
@@ -50,6 +50,7 @@ def plan_edit(request, pk):
 
 
 @login_required
+@require_POST
 def plan_delete(request, pk):
     profile  = UserDetail.objects.filter(user=request.user).first()
     if not profile:

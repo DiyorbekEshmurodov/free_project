@@ -43,13 +43,16 @@
                                 {% endif %}
                             </td>
                             <td style="padding: 12px;">
-                                <div class="table-data-feature" style="display: flex; gap: 10px;">
+                                <div class="table-data-feature" style="display: flex; gap: 10px; align-items: center;">
                                     <a class="item" href="{% url 'user_edit' pk=item.id %}" title="Tahrirlash">
                                         ✏️ Edit
                                     </a>
-                                    <a class="item" href="{% url 'user_delete' pk=item.id %}" title="O'chirish" style="color: #ef4444;">
-                                        🗑️ Delete
-                                    </a>
+                                    <form action="{% url 'user_delete' pk=item.id %}" method="post" style="display: inline;">
+                                        {% csrf_token %}
+                                        <button type="submit" class="item" title="O'chirish" style="background: none; border: none; color: #ef4444; cursor: pointer; padding: 0; font-size: inherit;" onclick="return confirm('Haqiqatdan ham bu rejani o\'chirmoqchimisiz?');">
+                                            🗑️ Delete
+                                        </button>
+                                    </form>
                                 </div>
                             </td>
                         </tr>

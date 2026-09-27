@@ -1,9 +1,12 @@
 from django.shortcuts import render
+from django.contrib.auth.decorators import login_required
 from .services import ai_handler
 from .models import UserQuestion
 from .prompts import SECTION_MAP
 from apps.accounts.models import UserDetail
+
 # 1. BARCHA KARTALAR RO'YXATI UCHUN UNIVERSAL VIEW
+@login_required
 def cards_list_view(request, section_name):
     section_data = SECTION_MAP.get(section_name)
 
@@ -23,6 +26,7 @@ def cards_list_view(request, section_name):
 
 
 # 2. TANLANGAN KARTA DETAIL KUNI UCHUN UNIVERSAL VIEW
+@login_required
 def card_detail_view(request, section_name, question_id):
     section_data = SECTION_MAP.get(section_name)
     question_data = section_data['questions'].get(question_id)

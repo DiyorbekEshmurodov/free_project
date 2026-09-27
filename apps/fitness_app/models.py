@@ -21,7 +21,14 @@ class FitnessPlan(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"{self.user.username} - {self.title} ({self.period_type})"
+        # Xavfsiz usul: user yoki telegram_user username-ini olish
+        username = "Noma'lum"
+        if self.user and self.user.user:
+            username = self.user.user.username
+        elif self.user and hasattr(self.user, 'telegram_user') and self.user.telegram_user:
+            username = self.user.telegram_user.username
+
+        return f"{username} - {self.title} ({self.period_type})"
 
 @receiver(post_save, sender=User)
 def create_user_profile(sender, instance, created, **kwargs):

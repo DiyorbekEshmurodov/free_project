@@ -1,11 +1,16 @@
-from aiogram import Bot, Dispatcher ,Router,types
+import os
+import django
+from aiogram import Router,types
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardRemove,ReplyKeyboardMarkup,KeyboardButton
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from apps.accounts.models import UserDetail
 from django.contrib.auth.models import User
+from asgiref.sync import sync_to_async
 from . import globals
 from .states import LoginStates
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
+django.setup()
 main_router = Router()
 phone_keyboard = ReplyKeyboardMarkup(
     keyboard=[
@@ -16,15 +21,63 @@ phone_keyboard = ReplyKeyboardMarkup(
     resize_keyboard=True,
     one_time_keyboard=True
 )
+@sync_to_async
+def get_user_detail(telegram_id):
+    return UserDetail.objects.filter(telegram_id=telegram_id).select_related('user').first()
 
+@sync_to_async
+def check_username_exists(username):
+    return UserDetail.objects.filter(username=username).exists()
+
+@sync_to_async
+def save_user_registration_data(telegram_id , username_input, password, data):
+    # 1. Telegram ID bo'yicha profilni olamiz yoki yaratamiz
+    user_detail, created = UserDetail.objects.get_or_create(telegram_id=telegram_id)
+
+    # 2. Agar profilga telegram_user bog'langan bo'lsa, o'sha user'ni yangilaymiz
+    if user_detail.telegram_user is not None:
+        user = user_detail.telegram_user
+        user.username = username_input
+        user.set_password(password)
+        user.first_name = data.get('first_name', '')
+        user.last_name = data.get('last_name', '')
+        user.save()
+    else:
+        # 3. Agar telegram_user bor bo'lmasa (None bo'lsa), username mavjudligini tekshiramiz
+        existing_user = User.objects.filter(username=username_input).first()
+
+        if existing_user:
+            # Username mavjud bo'lsa, parolini yangilab ushbu user'ni telegram_user ga biriktiramiz
+            user = existing_user
+            user.set_password(password)
+            user.first_name = data.get('first_name', '')
+            user.last_name = data.get('last_name', '')
+            user.save()
+        else:
+            # Username yo'q bo'lsa, yangi User yaratamiz
+            user = User.objects.create_user(
+                username=username_input,
+                password=password,
+                first_name=data.get('first_name', ''),
+                last_name=data.get('last_name', '')
+            )
+
+        # User'ni telegram_user ga biriktiramiz
+        user_detail.telegram_user = user
+
+    # 4. Profil ma'lumotlarini saqlaymiz
+    user_detail.first_name = data.get('first_name')
+    user_detail.last_name = data.get('last_name')
+    user_detail.phone_number = data.get('phone_number')
+    user_detail.save()
 
 @main_router.message(Command('start'))
 async def start(message: types.Message, state: FSMContext):
     await message.answer(globals.WELCOME_TEXT)
     user_telegram_id = message.from_user.id
     site_url = f"https://lifegym-kapp.onrender.com/auto-login/{user_telegram_id}/"
-    user_detail = UserDetail.objects.filter(telegram_id=message.from_user.id).first()
 
+    user_detail = await get_user_detail(user_telegram_id)
     # AGAR USER MAVJUD BO'LSA - Shunchaki saytga havola beramiz
     if user_detail and user_detail.user:
         buttons = InlineKeyboardMarkup(
@@ -68,13 +121,11 @@ async def phone_number(message: types.Message, state: FSMContext):
     await state.set_state(LoginStates.username)
     await message.answer("Saytga kirish uchun **Login (Username)** kiriting:", reply_markup=ReplyKeyboardRemove())
 
-
 @main_router.message(LoginStates.username)
 async def process_username(message: types.Message, state: FSMContext):
     username = message.text.strip()
-
-    # Login band emasligini tekshirish
-    if User.objects.filter(username=username).exists():
+    is_token = await check_username_exists(username)
+    if is_token:
         await message.answer("Ushbu login band! Iltimos, boshqa login kiriting:")
         return
 
@@ -101,46 +152,7 @@ async def process_password(message: types.Message, state: FSMContext):
     username_input = data.get('username')
 
     try:
-        # 1. Telegram ID bo'yicha profilni olamiz yoki yaratamiz
-        user_detail, created = UserDetail.objects.get_or_create(telegram_id=telegram_id)
-
-        # 2. Agar profilga telegram_user bog'langan bo'lsa, o'sha user'ni yangilaymiz
-        if user_detail.telegram_user is not None:
-            user = user_detail.telegram_user
-            user.username = username_input
-            user.set_password(password)
-            user.first_name = data.get('first_name', '')
-            user.last_name = data.get('last_name', '')
-            user.save()
-        else:
-            # 3. Agar telegram_user bor bo'lmasa (None bo'lsa), username mavjudligini tekshiramiz
-            existing_user = User.objects.filter(username=username_input).first()
-
-            if existing_user:
-                # Username mavjud bo'lsa, parolini yangilab ushbu user'ni telegram_user ga biriktiramiz
-                user = existing_user
-                user.set_password(password)
-                user.first_name = data.get('first_name', '')
-                user.last_name = data.get('last_name', '')
-                user.save()
-            else:
-                # Username yo'q bo'lsa, yangi User yaratamiz
-                user = User.objects.create_user(
-                    username=username_input,
-                    password=password,
-                    first_name=data.get('first_name', ''),
-                    last_name=data.get('last_name', '')
-                )
-
-            # User'ni telegram_user ga biriktiramiz
-            user_detail.telegram_user = user
-
-        # 4. Profil ma'lumotlarini saqlaymiz
-        user_detail.first_name = data.get('first_name')
-        user_detail.last_name = data.get('last_name')
-        user_detail.phone_number = data.get('phone_number')
-        user_detail.save()
-
+        await save_user_registration_data(telegram_id, username_input,password, data)
         await state.clear()
         site_url = f"https://lifegym-kapp.onrender.com/auto-login/{telegram_id}/"
         buttons = InlineKeyboardMarkup(
@@ -164,3 +176,4 @@ async def process_password(message: types.Message, state: FSMContext):
     except Exception as e:
         print(f"Xatolik yuz berdi: {e}")
         await message.answer("❌ Saqlashda xatolik yuz berdi. Iltimos, qaytadan urinib ko'ring.")
+

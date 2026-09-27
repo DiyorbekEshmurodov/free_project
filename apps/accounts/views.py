@@ -6,7 +6,7 @@ from django.shortcuts import render,redirect
 from django.contrib.auth import authenticate,login,logout
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-
+from django.core.signing import TimestampSigner, BadSignature, SignatureExpired
 
 
 @login_required
@@ -34,15 +34,26 @@ def dashboard_view(request):
     return render(request, 'index.html', context)
 
 
-def auto_login_view(request, telegram_id):
+def auto_login_view(request, token):
+    """
+        Xavfsiz bir martalik token orqali kirish (Telegram ID o'rniga token ishlatiladi).
+        Token 10 daqiqa (600 soniya) davomida amal qiladi.
+    """
+    signer = TimestampSigner()
+    try:
+        # Tokenni tekshirish va undan telegram_id ni ajratib olish (max_age = 600 soniya)
+        telegram_id = signer.unsign(token, max_age=600)
+        profil = UserDetail.objects.filter(telegram_id=telegram_id).first()
 
-    profil = UserDetail.objects.filter(telegram_id=telegram_id).first()
+        if profil and profil.user:
+            login(request, profil.user)
+            return redirect('index')
+        else:
+            messages.error(request, "Foydalanuvchi profili topilmadi.")
+            return redirect('login_page')
 
-    if profil and profil.user:
-        login(request, profil.user)
-        return redirect('/ai_app/dashboard/')
-    else:
-        # Profil topilmasa, login sahifasiga yuboramiz
+    except (SignatureExpired, BadSignature):
+        messages.error(request, "Kirish havolasining vaqti o'tgan yoki havola noto'g'ri!")
         return redirect('login_page')
 
 def login_required_decorator(func):
@@ -127,7 +138,7 @@ def login_page(request):
                 else :
                     messages.error(request,"Yangi parollar mos kelmadi!")
             except User.DoesNotExist:
-                    messages.error(request, 'Bunday foydalanuvchi topilmadi!')
+                    messages.error(request, 'Paroldi tiklash uchun qaytadan kiring!')
 
     return render(request,'accounts/login.html')
 
