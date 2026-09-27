@@ -1,3 +1,4 @@
+from functools import wraps
 from django.shortcuts import render, redirect, get_object_or_404
 from django.views.generic import TemplateView
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -5,15 +6,29 @@ from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
 from .models import FitnessPlan
 from .forms import FitnessPlanForm
-from apps.accounts.models import UserDetail
+from apps.accounts.services import get_user_profile
+from .ai_api import generate_user_advice as ai_generate_advice
+
+
+def profile_required(view_func):
+    """Ilgari 'profil topilmasa profile_setup'ga yo'naltirish' bloki
+    plan_list/plan_create/plan_edit/plan_delete funksiyalarining har
+    birida so'zma-so'z takrorlanardi (DRY buzilishi). Endi bitta decorator."""
+    @wraps(view_func)
+    def wrapper(request, *args, **kwargs):
+        profile = get_user_profile(request.user)
+        if not profile:
+            return redirect('profile_setup')
+        request.profile = profile
+        return view_func(request, *args, **kwargs)
+    return wrapper
+
 
 @login_required
+@profile_required
 def plan_list(request):
-    profile = UserDetail.objects.filter(user=request.user).first()
-    if not profile:
-        return redirect('profile_setup')
     period = request.GET.get('period', 'daily')
-    plans = FitnessPlan.objects.filter(user=profile, period_type=period).order_by('target_date')
+    plans = FitnessPlan.objects.filter(user=request.profile, period_type=period).order_by('target_date')
 
     ctx = {
         'plans': plans,
@@ -23,25 +38,21 @@ def plan_list(request):
 
 
 @login_required
+@profile_required
 def plan_create(request):
-    profile = UserDetail.objects.filter(user=request.user).first()
-    if not profile:
-        return redirect('profile_setup')
     form = FitnessPlanForm(request.POST or None)
     if request.method == 'POST' and form.is_valid():
         plan = form.save(commit=False)
-        plan.user = profile
+        plan.user = request.profile
         plan.save()
         return redirect('user_list')
     return render(request, 'fitness_app/form.html', {'form': form})
 
 
 @login_required
+@profile_required
 def plan_edit(request, pk):
-    profile = UserDetail.objects.filter(user=request.user).first()
-    if not profile :
-        return redirect('profile_setup')
-    plan = get_object_or_404(FitnessPlan, pk=pk, user=profile)
+    plan = get_object_or_404(FitnessPlan, pk=pk, user=request.profile)
     form = FitnessPlanForm(request.POST or None, instance=plan)
     if request.method == 'POST' and form.is_valid():
         form.save()
@@ -51,22 +62,16 @@ def plan_edit(request, pk):
 
 @login_required
 @require_POST
+@profile_required
 def plan_delete(request, pk):
-    profile  = UserDetail.objects.filter(user=request.user).first()
-    if not profile:
-        return redirect('profile_setup')
-    plan = get_object_or_404(FitnessPlan, pk=pk, user=profile)
+    plan = get_object_or_404(FitnessPlan, pk=pk, user=request.profile)
     plan.delete()
     return redirect('user_list')
 
 
 def user_plan(request):
-    has_profile = False
-    if request.user.is_authenticated:
-        has_profile = UserDetail.objects.filter(user=request.user).exists()
-
     context = {
-        'has_profile': has_profile,
+        'has_profile': get_user_profile(request.user) is not None,
     }
     return render(request, 'index.html', context)
 
@@ -75,7 +80,7 @@ class AIReportView(LoginRequiredMixin, TemplateView):
     template_name = 'fitness_app/reports.html'
 
     def dispatch(self, request, *args, **kwargs):
-        if request.user.is_authenticated and not UserDetail.objects.filter(user=request.user).exists():
+        if request.user.is_authenticated and get_user_profile(request.user) is None:
             return redirect('profile_setup')
         return super().dispatch(request, *args, **kwargs)
 
@@ -88,7 +93,10 @@ class AIReportView(LoginRequiredMixin, TemplateView):
             {'id': 'health_habits', 'icon': '🥗', 'title': "Sog'lom turmush tarzi", 'desc': "Kunlik to'g'ri odatlarni shakllantirish."}
         ]
         context['cards'] = cards
-        profil = UserDetail.objects.filter(user=self.request.user).first()
+        # Bitta so'rov — dispatch() da olingan natija bilan bir xil, lekin
+        # Django bu ikkalasini alohida so'rov sifatida yuboradi; kelajakda
+        # request.profil = ... ko'rinishida keshlash yanada optimallashtiradi.
+        profil = get_user_profile(self.request.user)
         context['profil'] = profil
         context['has_profile'] = profil is not None
 
@@ -100,13 +108,13 @@ class AIPageDetailView(LoginRequiredMixin, TemplateView):
     template_name = 'fitness_app/ai_page.html'
 
     def dispatch(self, request, *args, **kwargs):
-        if request.user.is_authenticated and not UserDetail.objects.filter(user=request.user).exists():
+        if request.user.is_authenticated and get_user_profile(request.user) is None:
             return redirect('profile_setup')
         return super().dispatch(request, *args, **kwargs)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        profile = UserDetail.objects.filter(user=self.request.user).first()
+        profile = get_user_profile(self.request.user)
 
         selected_card = self.request.GET.get('card', 'weight_loss')
         selected_period = self.request.GET.get('period', 'weekly')
@@ -119,8 +127,10 @@ class AIPageDetailView(LoginRequiredMixin, TemplateView):
         }
         period_label = period_titles.get(selected_period, 'Haftalik')
 
-        # Kengaytirilgan AI Maslahati
-        advice_data = self.generate_user_advice(profile, selected_card, selected_period)
+        # Avval haqiqiy AI (Groq) orqali maslahat olishga harakat qilamiz;
+        # ai_api.py o'zi ham API kaliti bo'lmasa yoki xatolik bersa ichki
+        # zaxira matnni qaytaradi, shu bilan sahifa hech qachon bo'sh qolmaydi.
+        advice_data = ai_generate_advice(profile, selected_card, selected_period)
 
         # Diagramma (Graph) uchun dinamik ma'lumotlar
         chart_data = self.get_chart_data(selected_period, selected_card)

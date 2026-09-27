@@ -19,7 +19,7 @@ sys.path.insert(0, os.path.join(BASE_DIR, 'apps'))
 dotenv.load_dotenv(BASE_DIR / '.env')
 
 # SECRET_KEY `.env` faylidan olinadi (agar bo'lmasa fallback ishlatiladi)
-SECRET_KEY = config('SECRET_KEY', default='django-insecure-b2+c^s#d3jq5y2eg6u!%e-z12wo4_*hcfkhjgfqfgm-&b$b1u#')
+SECRET_KEY = config('SECRET_KEY')
 
 # Debug rejimini tekshirish
 DEBUG = config('DEBUG', default=False, cast=bool)

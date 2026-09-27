@@ -1,4 +1,5 @@
 from django.shortcuts import render
+from django.http import Http404
 from django.contrib.auth.decorators import login_required
 from .services import ai_handler
 from .models import UserQuestion
@@ -9,6 +10,9 @@ from apps.accounts.models import UserDetail
 @login_required
 def cards_list_view(request, section_name):
     section_data = SECTION_MAP.get(section_name)
+
+    if section_data is None:
+        raise Http404('Bunday bulim topilmadi')
 
     profil = None
     if request.user.is_authenticated:
@@ -29,7 +33,11 @@ def cards_list_view(request, section_name):
 @login_required
 def card_detail_view(request, section_name, question_id):
     section_data = SECTION_MAP.get(section_name)
+    if section_data is None:
+        raise Http404('Bunday bulim topilmadi')
     question_data = section_data['questions'].get(question_id)
+    if section_data is None:
+        raise Http404('Bunday bulim topilmadi')
 
     profil = None
     user_info = None

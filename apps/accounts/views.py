@@ -1,5 +1,6 @@
 from .models import UserDetail
 from .forms import UserDetailForm
+from .services import get_user_profile
 
 from django.contrib.auth.models import User
 from django.shortcuts import render,redirect
@@ -7,14 +8,41 @@ from django.contrib.auth import authenticate,login,logout
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
 from django.core.signing import TimestampSigner, BadSignature, SignatureExpired
+from django.core.cache import cache
+
+
+def _get_client_ip(request):
+    forwarded = request.META.get('HTTP_X_FORWARDED_FOR')
+    if forwarded:
+        return forwarded.split(',')[0].strip()
+    return request.META.get('REMOTE_ADDR', 'unknown')
+
+
+def _too_many_login_attempts(request):
+    """Tashqi qo'shimcha kutubxonasiz, Django cache orqali sodda
+    brute-force himoyasi: bir IP 1 daqiqada 5 martadan ko'p muvaffaqiyatsiz
+    login urinishi qilsa, vaqtincha bloklanadi."""
+    cache_key = f"login_attempts:{_get_client_ip(request)}"
+    attempts = cache.get(cache_key, 0)
+    return attempts >= 5
+
+
+def _register_failed_login_attempt(request):
+    cache_key = f"login_attempts:{_get_client_ip(request)}"
+    attempts = cache.get(cache_key, 0)
+    cache.set(cache_key, attempts + 1, timeout=60)  # 60 soniyalik oyna
+
+
+def _clear_login_attempts(request):
+    cache.delete(f"login_attempts:{_get_client_ip(request)}")
 
 
 @login_required
 def dashboard_view(request):
-    # Foydalanuvchi profilini izlaymiz
-    profil = UserDetail.objects.filter(user=request.user).first()
-    if not profil:
-        profil = UserDetail.objects.filter(telegram_user=request.user).first()
+    # Ilgari bu yerda 2 marta alohida so'rov yuborilardi
+    # (user= bo'yicha, topilmasa telegram_user= bo'yicha) — endi bitta
+    # umumiy funksiya orqali, 1 ta so'rov bilan.
+    profil = get_user_profile(request.user)
 
     has_profile = False
 
@@ -72,9 +100,13 @@ def profile_setup(request):
         form = UserDetailForm(request.POST, request.FILES,instance=profile)
         if form.is_valid():
             form.save()
-            request.user.first_name = request.POST.get('first_name', request.user.first_name)
-            request.user.last_name = request.POST.get('last_name', request.user.last_name)
-            request.user.save()
+            # Avval bu yerda request.POST dan to'g'ridan-to'g'ri o'qilardi —
+            # bu forma validatsiyasini (uzunlik chegarasi va h.k.) chetlab
+            # o'tar edi. UserDetailForm'da first_name/last_name allaqachon
+            # bor va tekshirilgan, shuning uchun form.cleaned_data ishlatiladi.
+            request.user.first_name = form.cleaned_data.get('first_name') or request.user.first_name
+            request.user.last_name = form.cleaned_data.get('last_name') or request.user.last_name
+            request.user.save(update_fields=['first_name', 'last_name'])
             messages.success(request, "Ma'lumotlaringiz muvaffaqiyatli saqlandi!")
             return redirect('index')
     else:
@@ -94,11 +126,21 @@ def login_page(request):
         phone_number = request.POST.get('phone')
 
         if action_type == 'login':
+            if _too_many_login_attempts(request):
+                messages.error(
+                    request,
+                    "Juda ko'p noto'g'ri urinish qilindi. Iltimos, 1 daqiqadan "
+                    "so'ng qaytadan urinib ko'ring."
+                )
+                return render(request, 'accounts/login.html')
+
             user = authenticate(request, username=username, password=password)
             if user is not None:
+                _clear_login_attempts(request)
                 login(request, user)
                 return redirect('index')
             else :
+                _register_failed_login_attempt(request)
                 return render(request,'accounts/login.html',{'error':'Username yoki parol xato kiritilgan\nQaytadan kiriting 😁 '})
 
 
@@ -121,24 +163,31 @@ def login_page(request):
 
         elif action_type == 'reset':
             confirm_password = request.POST.get('confirm_password')
-            try :
+            try:
                 user = User.objects.get(username=username)
                 has_upper = any(char.isupper() for char in password)
                 has_lower = any(char.islower() for char in password)
+
+                # Avvalgi kodda bu ikki tekshiruv alohida if bloklarida edi va
+                # pastdagi "if password == confirm_password" shartini
+                # to'xtatmas edi — natijada zaif, lekin bir-biriga mos parol
+                # baribir saqlanib qolardi. Endi bitta if/elif/else zanjiri:
                 if password != confirm_password:
                     messages.error(request, 'Parollar bir xil emas!')
                 elif len(password) < 8 or not has_upper or not has_lower:
-                    messages.error(request,
-                    "Yangi parol kamida 8 ta belgi, 1 ta katta va 1 ta kichik harfdan iborat bo'lishi kerak!")
-                if password == confirm_password:
+                    messages.error(
+                        request,
+                        "Yangi parol kamida 8 ta belgi, 1 ta katta va 1 ta kichik "
+                        "harfdan iborat bo'lishi kerak!"
+                    )
+                else:
+                    # Faqat HAR IKKALA shart (mosligi + kuchliligi) bajarilganda saqlanadi
                     user.set_password(password)
                     user.save()
                     login(request, user)
                     return redirect('index')
-                else :
-                    messages.error(request,"Yangi parollar mos kelmadi!")
             except User.DoesNotExist:
-                    messages.error(request, 'Paroldi tiklash uchun qaytadan kiring!')
+                messages.error(request, 'Parolni tiklash uchun qaytadan kiring!')
 
     return render(request,'accounts/login.html')
 
@@ -149,4 +198,3 @@ def main_account(request):
 
 def index_page(request):
     return dashboard_view(request)
-

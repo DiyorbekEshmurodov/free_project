@@ -1,17 +1,32 @@
 import os
 import django
-from aiogram import Router,types
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardRemove,ReplyKeyboardMarkup,KeyboardButton
+from aiogram import Router, types
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardRemove, ReplyKeyboardMarkup,KeyboardButton
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from apps.accounts.models import UserDetail
 from django.contrib.auth.models import User
+from django.core.signing import TimestampSigner
 from asgiref.sync import sync_to_async
 from . import globals
 from .states import LoginStates
+
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
 django.setup()
 main_router = Router()
+
+# auto_login_view() aynan shu signerdan foydalanib tokenni tekshiradi,
+# shuning uchun bu yerda ham xuddi shu usulda imzolanishi SHART.
+signer = TimestampSigner()
+
+
+def build_auto_login_url(telegram_id: int) -> str:
+    """Telegram ID ni xavfsiz, vaqt bilan cheklangan tokenga aylantirib,
+    auto-login havolasini yaratadi."""
+    signed_token = signer.sign(str(telegram_id))
+    return f"https://lifegym-kapp.onrender.com/auto-login/{signed_token}/"
+
+
 phone_keyboard = ReplyKeyboardMarkup(
     keyboard=[
         [
@@ -21,40 +36,48 @@ phone_keyboard = ReplyKeyboardMarkup(
     resize_keyboard=True,
     one_time_keyboard=True
 )
+
+
 @sync_to_async
 def get_user_detail(telegram_id):
     return UserDetail.objects.filter(telegram_id=telegram_id).select_related('user').first()
 
+
 @sync_to_async
 def check_username_exists(username):
-    return UserDetail.objects.filter(username=username).exists()
+    # UserDetail modelida 'username' maydoni yo'q — Django User modeli
+    # bo'yicha tekshirilishi kerak, aks holda FieldError bilan crash beradi.
+    return User.objects.filter(username=username).exists()
+
 
 @sync_to_async
-def save_user_registration_data(telegram_id , username_input, password, data):
-    # 1. Telegram ID bo'yicha profilni olamiz yoki yaratamiz
-    user_detail, created = UserDetail.objects.get_or_create(telegram_id=telegram_id)
+def save_user_registration_data(telegram_id, username_input, password, data):
+    # 1. Shu telegram_id bilan bog'liq profil (agar avval boshlangan bo'lsa) izlanadi
+    user_detail = UserDetail.objects.filter(telegram_id=telegram_id).first()
 
-    # 2. Agar profilga telegram_user bog'langan bo'lsa, o'sha user'ni yangilaymiz
-    if user_detail.telegram_user is not None:
-        user = user_detail.telegram_user
+    if user_detail and user_detail.user:
+        # Profil va unga bog'langan User allaqachon mavjud — shunchaki yangilaymiz
+        user = user_detail.user
         user.username = username_input
         user.set_password(password)
         user.first_name = data.get('first_name', '')
         user.last_name = data.get('last_name', '')
         user.save()
     else:
-        # 3. Agar telegram_user bor bo'lmasa (None bo'lsa), username mavjudligini tekshiramiz
         existing_user = User.objects.filter(username=username_input).first()
 
         if existing_user:
-            # Username mavjud bo'lsa, parolini yangilab ushbu user'ni telegram_user ga biriktiramiz
             user = existing_user
             user.set_password(password)
             user.first_name = data.get('first_name', '')
             user.last_name = data.get('last_name', '')
             user.save()
         else:
-            # Username yo'q bo'lsa, yangi User yaratamiz
+            # Yangi User yaratiladi. DIQQAT: bu chaqiruv post_save signalini
+            # ishga tushiradi va signal AVTOMATIK ravishda UserDetail(user=user)
+            # qatorini yaratadi — shuning uchun bu yerda o'zimiz alohida
+            # UserDetail.objects.create(...) qilmaymiz, aks holda dublikat
+            # paydo bo'lardi.
             user = User.objects.create_user(
                 username=username_input,
                 password=password,
@@ -62,20 +85,26 @@ def save_user_registration_data(telegram_id , username_input, password, data):
                 last_name=data.get('last_name', '')
             )
 
-        # User'ni telegram_user ga biriktiramiz
-        user_detail.telegram_user = user
+        # Signal (yoki avvalgi ro'yxatdan o'tish) allaqachon yaratgan yagona
+        # profilni topib, aynan O'SHANI ishlatamiz — yangi qator OCHMAYMIZ.
+        if user_detail is None:
+            user_detail, _ = UserDetail.objects.get_or_create(user=user)
 
-    # 4. Profil ma'lumotlarini saqlaymiz
+    # 2. Yagona UserDetail qatoriga barcha ma'lumotlarni yozamiz
+    user_detail.telegram_id = telegram_id
+    user_detail.telegram_user = user
+    user_detail.user = user
     user_detail.first_name = data.get('first_name')
     user_detail.last_name = data.get('last_name')
     user_detail.phone_number = data.get('phone_number')
     user_detail.save()
 
+
 @main_router.message(Command('start'))
 async def start(message: types.Message, state: FSMContext):
     await message.answer(globals.WELCOME_TEXT)
     user_telegram_id = message.from_user.id
-    site_url = f"https://lifegym-kapp.onrender.com/auto-login/{user_telegram_id}/"
+    site_url = build_auto_login_url(user_telegram_id)
 
     user_detail = await get_user_detail(user_telegram_id)
     # AGAR USER MAVJUD BO'LSA - Shunchaki saytga havola beramiz
@@ -121,6 +150,7 @@ async def phone_number(message: types.Message, state: FSMContext):
     await state.set_state(LoginStates.username)
     await message.answer("Saytga kirish uchun **Login (Username)** kiriting:", reply_markup=ReplyKeyboardRemove())
 
+
 @main_router.message(LoginStates.username)
 async def process_username(message: types.Message, state: FSMContext):
     username = message.text.strip()
@@ -152,9 +182,9 @@ async def process_password(message: types.Message, state: FSMContext):
     username_input = data.get('username')
 
     try:
-        await save_user_registration_data(telegram_id, username_input,password, data)
+        await save_user_registration_data(telegram_id, username_input, password, data)
         await state.clear()
-        site_url = f"https://lifegym-kapp.onrender.com/auto-login/{telegram_id}/"
+        site_url = build_auto_login_url(telegram_id)
         buttons = InlineKeyboardMarkup(
             inline_keyboard=[[
                 InlineKeyboardButton(
@@ -176,4 +206,3 @@ async def process_password(message: types.Message, state: FSMContext):
     except Exception as e:
         print(f"Xatolik yuz berdi: {e}")
         await message.answer("❌ Saqlashda xatolik yuz berdi. Iltimos, qaytadan urinib ko'ring.")
-
