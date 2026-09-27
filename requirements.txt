@@ -83,3 +83,4 @@ urllib3==2.7.0
 websockets==16.1.1
 whitenoise==6.12.0
 yarl==1.24.5
+ngrok==1.7.0
