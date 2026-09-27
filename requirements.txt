@@ -17,7 +17,6 @@ distro==1.9.0
 dj-database-url==3.1.2
 Django==5.2.17
 django-cors-headers==4.9.0
-django-ngrok==0.1.0
 django-stubs==6.1.0
 django-stubs-ext==6.1.0
 djangorestframework==3.18.0
@@ -83,4 +82,3 @@ urllib3==2.7.0
 websockets==16.1.1
 whitenoise==6.12.0
 yarl==1.24.5
-ngrok==1.7.0
