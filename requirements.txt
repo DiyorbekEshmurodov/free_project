@@ -48,7 +48,6 @@ idna==3.18
 jiter==0.17.0
 magic-filter==1.0.12
 multidict==6.7.1
-ngrok==1.7.0
 openai==3.16.2
 pillow==12.3.0
 propcache==0.5.2
@@ -61,7 +60,6 @@ pyasn1_modules==0.4.2
 pycparser==3.0
 pydantic==2.13.4
 pydantic_core==2.46.4
-pyngrok==8.1.2
 pyparsing==3.3.2
 python-decouple==3.8
 python-dotenv==1.2.2
