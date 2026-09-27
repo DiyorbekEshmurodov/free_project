@@ -1,2 +1,19 @@
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environment variables
 .env
+.env.*
+
+# Media and static files
+media/
+staticfiles/
+
+# IDE settings
+.idea/
+.vscode/
+
+# Database
 db.sqlite3
