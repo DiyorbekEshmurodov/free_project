@@ -5,7 +5,7 @@ __pycache__/
 
 # Environment variables
 .env
-.env.*
+
 
 # Media and static files
 media/
