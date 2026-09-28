@@ -1,5 +1,7 @@
 import os
 import django
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
+django.setup()
 from aiogram import Router, types
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardRemove, ReplyKeyboardMarkup,KeyboardButton
 from aiogram.filters import Command
@@ -11,12 +13,8 @@ from asgiref.sync import sync_to_async
 from . import globals
 from .states import LoginStates
 
-os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
-django.setup()
-main_router = Router()
 
-# auto_login_view() aynan shu signerdan foydalanib tokenni tekshiradi,
-# shuning uchun bu yerda ham xuddi shu usulda imzolanishi SHART.
+main_router = Router()
 signer = TimestampSigner()
 
 
@@ -154,8 +152,8 @@ async def phone_number(message: types.Message, state: FSMContext):
 @main_router.message(LoginStates.username)
 async def process_username(message: types.Message, state: FSMContext):
     username = message.text.strip()
-    is_token = await check_username_exists(username)
-    if is_token:
+    is_exists = await check_username_exists(username)
+    if is_exists:
         await message.answer("Ushbu login band! Iltimos, boshqa login kiriting:")
         return
 
