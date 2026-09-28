@@ -2,6 +2,7 @@ import os
 import django
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
 django.setup()
+import logging
 from aiogram import Router, types
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardRemove, ReplyKeyboardMarkup,KeyboardButton
 from aiogram.filters import Command
@@ -16,6 +17,7 @@ from .states import LoginStates
 
 main_router = Router()
 signer = TimestampSigner()
+logger = logging.getLogger(__name__)
 
 
 def build_auto_login_url(telegram_id: int) -> str:
@@ -194,13 +196,14 @@ async def process_password(message: types.Message, state: FSMContext):
 
         await message.answer(
             f"✅ **Muvaffaqiyatli saqlandi!**\n\n"
-            f"🔑 **Loginingiz:** `{username_input}`\n"
-            f"🔒 **Parolingiz:** `{password}`\n\n"
-            f"Endi ushbu ma'lumotlar bilan saytga kirishingiz mumkin.",
+            f"🔑 **Loginingiz:** `{username_input}`\n\n"
+            f"🔒 Parolingizni siz o'zingiz kiritgansiz — uni xavfsiz joyda saqlang "
+            f"va hech kimga bermang (bot uni chatda qayta ko'rsatmaydi).\n\n"
+            f"Endi ushbu login va parolingiz bilan saytga kirishingiz mumkin.",
             reply_markup=buttons,
             parse_mode="Markdown"
         )
 
     except Exception as e:
-        print(f"Xatolik yuz berdi: {e}")
+        logger.error(f"Foydalanuvchini ro'yxatdan o'tkazishda xatolik: {e}")
         await message.answer("❌ Saqlashda xatolik yuz berdi. Iltimos, qaytadan urinib ko'ring.")

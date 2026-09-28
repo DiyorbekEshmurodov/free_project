@@ -21,6 +21,7 @@ django-stubs==6.1.0
 django-stubs-ext==6.1.0
 djangorestframework==3.18.0
 djangorestframework-stubs==3.18.1
+django-redis==5.4.0
 dotenv==0.9.9
 frozenlist==1.8.0
 geographiclib==2.1

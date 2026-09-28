@@ -11,8 +11,10 @@ class UserDetail(models.Model):
     first_name = models.CharField(max_length=100, null=True, blank=True)
     last_name = models.CharField(max_length=100, null=True, blank=True)
     phone_number = models.CharField(max_length=100, null=True, blank=True)
-    buyi = models.CharField(max_length=100, null=True, blank=True)
-    vazni = models.CharField(max_length=100, null=True, blank=True)
+    buyi = models.DecimalField(max_digits=7, decimal_places=2, null=True, blank=True,
+                               verbose_name="Bo'yi (sm)")
+    vazni = models.DecimalField(max_digits=7, decimal_places=2, null=True, blank=True,
+                                verbose_name="Vazni (kg)")
     jinsi = models.CharField(max_length=100, null=True, blank=True)
     maqsadi = models.CharField(max_length=100, null=True, blank=True)
     telegram_id = models.BigIntegerField(unique=True, null=True, blank=True)

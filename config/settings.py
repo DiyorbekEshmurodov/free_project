@@ -171,3 +171,64 @@ CSRF_TRUSTED_ORIGINS = [
 
 LOGIN_URL = 'login_page'
 BOT_TOKEN = config('BOT_TOKEN', default='dummy-bot-token-for-ci')
+
+# Login urinishlarini cheklash (accounts/views.py) uchun cache backend.
+# Ilgari CACHES umuman sozlanmagan edi — Django avtomatik LocMemCache
+# ishlatardi, bu esa faqat BITTA process xotirasida ishlaydi. Productionda
+# (masalan Gunicorn bir nechta worker bilan) har bir worker o'z alohida
+# hisobini yuritib, himoyani kuchsizlantiradi.
+#
+# Endi: agar .env da REDIS_URL ko'rsatilgan bo'lsa — Redis ishlatiladi
+# (barcha worker'lar bitta umumiy hisobni ko'radi). Ko'rsatilmasa — mahalliy
+# ishlab chiqish (development) uchun avvalgidek LocMemCache'ga tushadi,
+# hech narsa buzilmaydi.
+REDIS_URL = config('REDIS_URL', default=None)
+
+if REDIS_URL:
+    CACHES = {
+        'default': {
+            'BACKEND': 'django_redis.cache.RedisCache',
+            'LOCATION': REDIS_URL,
+            'OPTIONS': {
+                'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+            },
+        }
+    }
+else:
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        }
+    }
+
+# Ilgari kod ichida turli joylarda print() ishlatilardi (masalan bot_main.py,
+# ai_api.py) — bu productionda hech qayerga yozilmasdan yo'qoladi. Endi
+# barcha app'lar logging.getLogger(__name__) orqali xabar yozadi, quyidagi
+# sozlama esa ularni formatlab konsolga chiqaradi.
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'standard': {
+            'format': '[{asctime}] {levelname} {name}: {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'standard',
+        },
+    },
+    'root': {
+        'handlers': ['console'],
+        'level': 'INFO',
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console'],
+            'level': 'WARNING',
+            'propagate': False,
+        },
+    },
+}
