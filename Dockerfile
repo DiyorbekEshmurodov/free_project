@@ -1,21 +1,24 @@
 FROM python:3.11-slim
 
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
-# Paketlar ro'yxatini tezkor update qilish va keraksiz og'ir vositalarni olib tashlash
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    libpq-dev \
-    && rm -rf /var/lib/apt/lists/*
+# Xavfsizlik uchun ildiz bo'lmagan (non-root) appuser foydalanuvchisini yaratish
+RUN adduser --disabled-password --gecos "" appuser
 
 COPY requirements.txt /app/
-RUN pip install --upgrade pip
 RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . /app/
 
+# Fayllarni boshqarish huquqini appuser'ga o'tkazish
+RUN chown -R appuser:appuser /app
+
+USER appuser
+
 EXPOSE 8000
 
-CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+# Gunicorn WSGI serverini 3 ta worker bilan ishga tushirish
+CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "3", "config.wsgi:application"]

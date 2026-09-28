@@ -3,7 +3,10 @@
 
 {% block content %}
 <link rel="stylesheet" href="{% static 'css/ai_response.css' %}">
-<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+<!-- Xavfsiz va barqaror CDN kutubxonalari -->
+<script src="https://cdn.jsdelivr.net/npm/marked@4.3.0/marked.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js"></script>
 
 <div class="analysis-wrapper">
     <!-- AI javobi kartasi -->
@@ -27,11 +30,25 @@
     </div>
 </div>
 
+<!-- AI javobini XSS hujumlaridan xavfsiz o'tkazish uchun JSON script -->
+{{ ai_result|json_script:"ai-result-data" }}
+
 <script>
     document.addEventListener("DOMContentLoaded", function() {
-        const rawMarkdown = `{{ ai_result|escapejs }}`;
-        if (rawMarkdown) {
-            document.getElementById('ai-content').innerHTML = marked.parse(rawMarkdown);
+        // Django json_script'dan ma'lumotni xavfsiz olish
+        const rawDataElement = document.getElementById('ai-result-data');
+
+        if (rawDataElement) {
+            const rawMarkdown = JSON.parse(rawDataElement.textContent);
+
+            if (rawMarkdown) {
+                // 1. Markdown matnni HTML ga o'giramiz
+                const rawHtml = marked.parse(rawMarkdown);
+                // 2. DOMPurify orqali barcha zararli JavaScript kodingizni tozalaymiz (XSS Himoyasi)
+                const cleanHtml = DOMPurify.sanitize(rawHtml);
+                // 3. Ekranga tozalangan xavfsiz HTML ni chiqaramiz
+                document.getElementById('ai-content').innerHTML = cleanHtml;
+            }
         }
     });
 </script>

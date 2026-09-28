@@ -7,21 +7,27 @@ context_processors.py fayllarida alohida-alohida, har birida kamida
 bilan bitta so'rovda ishlaydi.
 """
 from django.db.models import Q
+from django.core.cache import cache
 from .models import UserDetail
 
 
 def get_user_profile(user):
-    """Berilgan Django User uchun bog'liq UserDetail profilini qaytaradi
-    (avval 'user' FK, keyin 'telegram_user' FK bo'yicha), topilmasa None."""
+    """
+    Foydalanuvchi profilini keshdan yoki DB dan olish.
+    """
     if not user or not user.is_authenticated:
         return None
-    return (
-        UserDetail.objects
-        .select_related('user', 'telegram_user')
-        .filter(Q(user=user) | Q(telegram_user=user))
-        .order_by('-id')
-        .first()
-    )
+
+    cache_key = f"user_profile_{user.id}"
+    profile = cache.get(cache_key)
+
+    if profile is None:
+        profile = UserDetail.objects.filter(user=user).first()
+        if profile:
+            # Profilni 15 daqiqaga keshga saqlaymiz
+            cache.set(cache_key, profile, timeout=900)
+
+    return profile
 
 
 def user_has_profile(user) -> bool:

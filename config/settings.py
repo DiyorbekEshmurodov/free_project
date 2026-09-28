@@ -18,7 +18,7 @@ sys.path.insert(0, os.path.join(BASE_DIR, 'apps'))
 # .env faylini yuklash
 dotenv.load_dotenv(BASE_DIR / '.env')
 
-# SECRET_KEY `.env` faylidan olinadi (agar bo'lmasa fallback ishlatiladi)
+# SECRET_KEY `.env` faylidan olinadi
 SECRET_KEY = config('SECRET_KEY')
 
 # Debug rejimini tekshirish
@@ -29,8 +29,6 @@ GROQ_API_KEY = config("GROQ_API_KEY", default=None)
 groq_client = None
 if GROQ_API_KEY:
     groq_client = Groq(api_key=GROQ_API_KEY)
-
-os.environ["DJANGO_ALLOW_ASYNC_UNSAFE"] = "true"
 
 # Hostlar ro'yxati
 ALLOWED_HOSTS = config(
@@ -47,7 +45,6 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-
 
     'apps.accounts',
     'apps.ai_app',
@@ -96,7 +93,7 @@ if DATABASE_URL:
         'default': dj_database_url.config(default=DATABASE_URL, conn_max_age=600)
     }
 else:
-    # Standart PostgreSQL sozlamasi (agar DATABASE_URL berilmagan bo'lsa)
+    # Standart PostgreSQL sozlamasi
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.postgresql',
@@ -159,9 +156,23 @@ CSRF_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = 'Lax'
 CSRF_COOKIE_SAMESITE = 'Lax'
 
-# Production (HTTPS) uchun True qilinadi, Local muhitda False
+# Production (HTTPS) va Security Sarlavhalari
+SECURE_SSL_REDIRECT = config('SECURE_SSL', default=False, cast=bool)
 CSRF_COOKIE_SECURE = config('SECURE_SSL', default=False, cast=bool)
 SESSION_COOKIE_SECURE = config('SECURE_SSL', default=False, cast=bool)
+
+# Production Xavfsizlik sarlavhalari (Browser Himoyasi)
+SECURE_BROWSER_XSS_FILTER = True
+SECURE_CONTENT_TYPE_NOSNIFF = True
+X_FRAME_OPTIONS = 'DENY'
+
+if not DEBUG:
+    SECURE_SSL_REDIRECT = config('SECURE_SSL', default=True, cast=bool)
+    SESSION_COOKIE_SECURE = config('SECURE_SSL', default=True, cast=bool)
+    CSRF_COOKIE_SECURE = config('SECURE_SSL', default=True, cast=bool)
+    SECURE_HSTS_SECONDS = 31536000  # 1 год
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
 
 CSRF_TRUSTED_ORIGINS = [
     'https://zippy-upon-unscathed.ngrok-free.dev',
@@ -172,16 +183,8 @@ CSRF_TRUSTED_ORIGINS = [
 LOGIN_URL = 'login_page'
 BOT_TOKEN = config('BOT_TOKEN', default='dummy-bot-token-for-ci')
 
-# Login urinishlarini cheklash (accounts/views.py) uchun cache backend.
-# Ilgari CACHES umuman sozlanmagan edi — Django avtomatik LocMemCache
-# ishlatardi, bu esa faqat BITTA process xotirasida ishlaydi. Productionda
-# (masalan Gunicorn bir nechta worker bilan) har bir worker o'z alohida
-# hisobini yuritib, himoyani kuchsizlantiradi.
-#
-# Endi: agar .env da REDIS_URL ko'rsatilgan bo'lsa — Redis ishlatiladi
-# (barcha worker'lar bitta umumiy hisobni ko'radi). Ko'rsatilmasa — mahalliy
-# ishlab chiqish (development) uchun avvalgidek LocMemCache'ga tushadi,
-# hech narsa buzilmaydi.
+
+# Kesh sozlamasi (Redis / LocMemCache)
 REDIS_URL = config('REDIS_URL', default=None)
 
 if REDIS_URL:
@@ -201,10 +204,8 @@ else:
         }
     }
 
-# Ilgari kod ichida turli joylarda print() ishlatilardi (masalan bot_main.py,
-# ai_api.py) — bu productionda hech qayerga yozilmasdan yo'qoladi. Endi
-# barcha app'lar logging.getLogger(__name__) orqali xabar yozadi, quyidagi
-# sozlama esa ularni formatlab konsolga chiqaradi.
+
+# Logging Sozlamasi
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,

@@ -1,4 +1,4 @@
-name: Django CI
+name: Django CI/CD Pipeline
 
 on:
   push:
@@ -11,24 +11,18 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Kodni yuklab olish
-      uses: actions/checkout@v4
+    - uses: actions/checkout@v3
 
-    - name: Python muhitini sozlash
-      uses: actions/setup-python@v5
+    - name: Python moslash
+      uses: actions/setup-python@v4
       with:
-        python-version: '3.12'
+        python-version: '3.11'
 
     - name: Kutubxonalarni o'rnatish
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
-    - name: Migratsiyalarni tekshirish va Testlarni ishga tushirish
-      env:
-        SECRET_KEY: 'ci-secret-key-for-testing-only-12345'
-        DEBUG: 'True'
-        GEMINI_API_KEY: 'dummy-key-for-tests'
-        BOT_TOKEN: 'dummy-bot-token-for-ci'
+    - name: Testlarni yurgizish
       run: |
         python manage.py test

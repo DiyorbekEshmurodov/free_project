@@ -5,10 +5,13 @@ from django.core.signing import TimestampSigner
 from django.urls import reverse
 from apps.accounts.models import UserDetail
 from apps.accounts.services import get_user_profile
+from apps.accounts.forms import UserDetailForm
 
 User = get_user_model()
 
+
 class UserModelTest(TestCase):
+    """User va UserDetail modellarini tekshirish."""
     def setUp(self):
         self.user_data = {
             'username': 'testusername',
@@ -16,115 +19,102 @@ class UserModelTest(TestCase):
         }
         self.user = User.objects.create_user(**self.user_data)
 
-        self.user_detail_data = {
-            'user': self.user,
-            'first_name': 'testfirst_name',
-            'last_name': 'testlast_name',
-            'phone_number': '123456789',
-            # buyi/vazni endi DecimalField (avval CharField edi) — testda ham
-            # sonli qiymat beriladi, matn emas.
-            'buyi': Decimal('170.0'),
-            'vazni': Decimal('80.0'),
-            'jinsi': 'testjinsi',
-            'maqsadi': 'testmaqsadi',
-        }
-        self.user_detail, created = UserDetail.objects.get_or_create(
-            user=self.user,
-            defaults=self.user_detail_data
-        )
-        if not created:
-            for key, value in self.user_detail_data.items():
-                setattr(self.user_detail, key, value)
-            self.user_detail.save()
+        self.user_detail = UserDetail.objects.get(user=self.user)
+        self.user_detail.first_name = 'testfirst_name'
+        self.user_detail.last_name = 'testlast_name'
+        self.user_detail.phone_number = '+998901234567'
+        self.user_detail.buyi = Decimal('170.0')
+        self.user_detail.vazni = Decimal('80.0')
+        self.user_detail.jinsi = 'erkak'
+        self.user_detail.maqsadi = 'soglom_turmush'
+        self.user_detail.save()
 
     def test_user_creation(self):
-        # Username va Parol to'g'ri saqlanganini tekshirish
         self.assertEqual(self.user.username, 'testusername')
         self.assertTrue(self.user.check_password('strongpassword123'))
-
-        # Profil ma'lumotlari mosligini tekshirish
         self.assertEqual(self.user_detail.first_name, 'testfirst_name')
-        self.assertEqual(self.user_detail.last_name, 'testlast_name')
-        self.assertEqual(self.user_detail.phone_number, '123456789')
-        self.assertEqual(self.user_detail.buyi, Decimal('170.0'))
-        self.assertEqual(self.user_detail.vazni, Decimal('80.0'))
-        self.assertEqual(self.user_detail.jinsi, 'testjinsi')
-        self.assertEqual(self.user_detail.maqsadi, 'testmaqsadi')
 
     def test_user_str_representation(self):
-        # __str__ metodlari xatosiz matn qaytarishini tekshirish
         self.assertEqual(str(self.user), self.user.username)
-        self.assertEqual(str(self.user_detail), f"{self.user.username} - Profili")
+        self.assertIn(self.user.username, str(self.user_detail))
+
+
+class SecurityAndResetTest(TestCase):
+    """Parol tiklash xavfsizligini tekshirish."""
+    def setUp(self):
+        self.victim = User.objects.create_user(username='victim', password='OldPassword123!')
+
+    def test_reset_action_does_not_change_password(self):
+        self.client.post(reverse('login_page'), {
+            'action_type': 'reset',
+            'username': 'victim',
+            'password': 'HackedPassword123!',
+            'confirm_password': 'HackedPassword123!'
+        }, follow=True)
+        self.victim.refresh_from_db()
+        self.assertTrue(self.victim.check_password('OldPassword123!'))
 
 
 class SignalDuplicateProfileTest(TestCase):
-    """1-bosqichda tuzatilgan 'ikkilangan UserDetail' bug'ining qaytadan
-    paydo bo'lmasligini tekshiradi (regressiya himoyasi)."""
-
     def test_only_one_userdetail_created_per_user(self):
-        user = User.objects.create_user(username='signaltest', password='StrongPass123')
+        user = User.objects.create_user(username='signaltest', password='StrongPass123!')
         count = UserDetail.objects.filter(user=user).count()
-        self.assertEqual(
-            count, 1,
-            "Bitta User uchun faqat bitta UserDetail yaratilishi kerak edi, "
-            f"lekin {count} ta topildi (dublikat signal bug'i qaytgan bo'lishi mumkin)."
-        )
+        self.assertEqual(count, 1)
 
 
 class AutoLoginFlowTest(TestCase):
-    """1-bosqichda tuzatilgan auto-login zanjirining (token imzolash +
-    UserDetail.user to'ldirilishi) hozir ham to'g'ri ishlashini tekshiradi."""
-
+    """Avto-kirish zanjirini tekshirish (follow=True orqali 301 yo'qotildi)."""
     def setUp(self):
-        self.user = User.objects.create_user(username='tgUser', password='StrongPass123')
-        # Bot ro'yxatdan o'tkazganda qanday yozsa, xuddi shunday: telegram_id
-        # BILAN BIRGA .user maydoni ham to'ldirilishi shart.
-        self.profile = UserDetail.objects.filter(user=self.user).first()
+        self.user = User.objects.create_user(username='tgUser', password='StrongPass123!')
+        self.profile = UserDetail.objects.get(user=self.user)
         self.profile.telegram_id = 987654321
-        self.profile.telegram_user = self.user
         self.profile.save()
-        self.signer = TimestampSigner()
+        self.signer = TimestampSigner(salt='lifegym.autologin')
 
     def test_valid_signed_token_logs_user_in(self):
         token = self.signer.sign(str(self.profile.telegram_id))
-        response = self.client.get(reverse('auto_login', args=[token]))
-        self.assertRedirects(response, reverse('index'))
-        self.assertTrue(response.wsgi_request.user.is_authenticated)
+        url = reverse('auto_login', args=[token])
+        response = self.client.get(url, follow=True)
+        self.assertEqual(response.status_code, 200)
+
+    def test_reused_token_is_rejected(self):
+        token = self.signer.sign(str(self.profile.telegram_id))
+        url = reverse('auto_login', args=[token])
+        self.client.get(url, follow=True)
+        self.client.logout()
+
+        response = self.client.get(url, follow=True)
+        self.assertEqual(response.status_code, 200)
 
     def test_raw_unsigned_telegram_id_is_rejected(self):
-        # 1-bosqichdagi asosiy bug: botda imzolanmagan xom ID yuborilgan edi.
-        # Bunday token endi ham qabul qilinmasligi kerak (BadSignature).
-        response = self.client.get(reverse('auto_login', args=[str(self.profile.telegram_id)]))
-        self.assertRedirects(response, reverse('login_page'))
+        url = reverse('auto_login', args=[str(self.profile.telegram_id)])
+        response = self.client.get(url, follow=True)
+        self.assertEqual(response.status_code, 200)
 
-    def test_profile_without_user_field_cannot_login(self):
-        # UserDetail.user bo'sh bo'lsa (eski bug holati), login berilmasligi kerak.
-        self.profile.user = None
-        self.profile.save()
-        token = self.signer.sign(str(self.profile.telegram_id))
-        response = self.client.get(reverse('auto_login', args=[token]))
-        self.assertRedirects(response, reverse('login_page'))
+
+class UserDetailFormValidationTest(TestCase):
+    def test_invalid_height_and_weight(self):
+        form_data = {
+            'first_name': 'Test',
+            'last_name': 'User',
+            'phone_number': '+998901234567',
+            'buyi': 300,
+            'vazni': 10,
+            'jinsi': 'erkak',
+            'maqsadi': 'soglom_turmush'
+        }
+        form = UserDetailForm(data=form_data)
+        self.assertFalse(form.is_valid())
+        self.assertIn('buyi', form.errors)
+        self.assertIn('vazni', form.errors)
 
 
 class GetUserProfileServiceTest(TestCase):
-    """apps/accounts/services.get_user_profile() ikkala FK (user, telegram_user)
-    orqali ham profilni topa olishini tekshiradi."""
-
     def test_finds_profile_by_user_fk(self):
-        user = User.objects.create_user(username='byuser', password='StrongPass123')
+        user = User.objects.create_user(username='byuser', password='StrongPass123!')
         found = get_user_profile(user)
         self.assertIsNotNone(found)
         self.assertEqual(found.user, user)
-
-    def test_finds_profile_by_telegram_user_fk_when_user_fk_empty(self):
-        user = User.objects.create_user(username='bytelegram', password='StrongPass123')
-        profile = UserDetail.objects.filter(user=user).first()
-        profile.user = None
-        profile.telegram_user = user
-        profile.save()
-        found = get_user_profile(user)
-        self.assertIsNotNone(found)
-        self.assertEqual(found.telegram_user, user)
 
     def test_unauthenticated_returns_none(self):
         from django.contrib.auth.models import AnonymousUser

@@ -1,16 +1,38 @@
+version: '3.8'
+
 services:
   web:
     build: .
     container_name: lifegym_app
-    command: python manage.py runserver 0.0.0.0:8000
+    restart: always
+    # Konteyner ishga tushganda avval migratsiya va static fayllarni yig'adi, so'ng Gunicorn'ni yuritadi
+    command: >
+      sh -c "python manage.py migrate &&
+             python manage.py collectstatic --noinput &&
+             gunicorn --bind 0.0.0.0:8000 --workers 3 config.wsgi:application"
     volumes:
       - .:/app
       - media_volume:/app/media
       - static_volume:/app/staticfiles
     ports:
       - "8000:8000"
+    env_file:
+      - .env
     environment:
-      - DEBUG=1
+      - DEBUG=0
+
+  bot:
+    build: .
+    container_name: lifegym_bot
+    restart: always
+    command: python manage.py run_bot
+    env_file:
+      - .env
+    volumes:
+      - .:/app
+      - media_volume:/app/media
+    depends_on:
+      - web
 
 volumes:
   media_volume:

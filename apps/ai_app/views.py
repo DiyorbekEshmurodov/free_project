@@ -1,51 +1,48 @@
-from django.shortcuts import render
+from django.shortcuts import render, get_object_or_404
 from django.http import Http404
 from django.contrib.auth.decorators import login_required
-from .services import ai_handler
-from .models import UserQuestion
+
+from .services import get_cached_llm_completion
+from .models import UserQuestion, AICard
 from .prompts import SECTION_MAP
 from apps.accounts.models import UserDetail
 
-# 1. BARCHA KARTALAR RO'YXATI UCHUN UNIVERSAL VIEW
+
 @login_required
-def cards_list_view(request, section_name):
-    section_data = SECTION_MAP.get(section_name)
+def cards_list_view(request, card_id):
+    """1. Barcha kartalar ro'yxatini ko'rish view'si."""
+    card = get_object_or_404(AICard, id=card_id)
 
-    if section_data is None:
-        raise Http404('Bunday bulim topilmadi')
+    # A1: question_data va None tekshiruvi
+    question_data = card.get_question_data()
+    if question_data is None:
+        raise Http404("So'ralgan savol ma'lumotlari topilmadi.")
 
-    profil = None
-    if request.user.is_authenticated:
-        profil = UserDetail.objects.filter(user=request.user).first()
+    profil = UserDetail.objects.filter(user=request.user).first()
 
     ctx = {
-        'section_name': section_name,
-        'title': section_data['title'],
-        'subtitle': section_data['subtitle'],
-        'questions': section_data['questions'],
+        'card': card,
+        'question_data': question_data,
         'profil': profil,
         'has_profile': profil is not None,
     }
     return render(request, 'ai_app/cards.html', ctx)
 
 
-# 2. TANLANGAN KARTA DETAIL KUNI UCHUN UNIVERSAL VIEW
 @login_required
 def card_detail_view(request, section_name, question_id):
+    """2. Tanlangan karta tafsilotlarini ko'rish view'si."""
     section_data = SECTION_MAP.get(section_name)
     if section_data is None:
-        raise Http404('Bunday bulim topilmadi')
-    question_data = section_data['questions'].get(question_id)
-    if section_data is None:
-        raise Http404('Bunday bulim topilmadi')
+        raise Http404('Bunday bo\'lim topilmadi')
 
-    profil = None
-    user_info = None
-    if request.user.is_authenticated:
-        profil = UserDetail.objects.filter(user=request.user).last()
-        user_info = UserQuestion.objects.filter(user=request.user).last()
+    question_data = section_data.get('questions', {}).get(question_id)
+    if question_data is None:
+        raise Http404('Bunday savol topilmadi')
 
-    # Agar foydalanuvchi ma'lumotlari bo'lsa ularni, bo'lmasa standart qiymatlarni uzatamiz
+    profil = UserDetail.objects.filter(user=request.user).first()
+    user_info = UserQuestion.objects.filter(user=request.user).last()
+
     buyi = getattr(profil, 'buyi', None) or getattr(user_info, 'buyi', None) or 170
     vazni = getattr(profil, 'vazni', None) or getattr(user_info, 'vazni', None) or 70
     maqsadi = getattr(profil, 'maqsadi', None) or getattr(user_info, 'maqsadi', None) or "Sog'lom turmush tarzi"
@@ -60,7 +57,8 @@ def card_detail_view(request, section_name, question_id):
         f"Vazifa: Ushbu foydalanuvchiga tanlangan mavzu bo'yicha uning ko'rsatkichlariga mos amaliy va aniq maslahat bering."
     )
 
-    ai_result = ai_handler(full_prompt)
+    # C1: Kesh va taymautga ega LLM chaqiruvi
+    ai_result = get_cached_llm_completion(full_prompt)
 
     ctx = {
         'section_name': section_name,
