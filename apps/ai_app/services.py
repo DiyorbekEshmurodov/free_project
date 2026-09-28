@@ -27,7 +27,7 @@ def get_cached_llm_completion(prompt: str, timeout: int = 86400) -> str:
         # 2. Taymaut bilan Groq API ga murojaat qilish (max 10 soniya)
         response = client.chat.completions.create(
             messages=[{"role": "user", "content": prompt}],
-            model="llama-3.3-70b-versatile",
+            model="openai/gpt-oss-120b",
             timeout=10.0
         )
         result = response.choices[0].message.content

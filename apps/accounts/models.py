@@ -15,6 +15,7 @@ class UserDetail(models.Model):
 
     buyi = models.FloatField(null=True, blank=True)
     vazni = models.FloatField(null=True, blank=True)
+    last_login = models.DateTimeField(null=True, blank=True)
     avatar = models.ImageField(upload_to='avatars/', null=True, blank=True)
 
     class Meta:

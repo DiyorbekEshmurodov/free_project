@@ -166,7 +166,7 @@ SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = 'DENY'
 
-if not DEBUG:
+if not DEBUG and 'test' not in sys.argv:
     SECURE_SSL_REDIRECT = config('SECURE_SSL', default=True, cast=bool)
     SESSION_COOKIE_SECURE = config('SECURE_SSL', default=True, cast=bool)
     CSRF_COOKIE_SECURE = config('SECURE_SSL', default=True, cast=bool)
