@@ -24,5 +24,11 @@ jobs:
         pip install -r requirements.txt
 
     - name: Testlarni yurgizish
+      env:
+        SECRET_KEY: ${{ secrets.SECRET_KEY }}
+        BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+        GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        DEBUG: 'True'
+        ALLOWED_HOSTS: 'localhost,127.0.0.1'
       run: |
         python manage.py test
