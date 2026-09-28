@@ -1,6 +1,6 @@
 from django.urls import path
 from .views import *
-from apps.accounts.views import main_account
+
 
 urlpatterns = [
     path('',user_plan,name='user_plan'),
@@ -13,5 +13,5 @@ urlpatterns = [
     path('reports/',AIReportView.as_view(),name="reports"),
     path('ai_page/', AIPageDetailView.as_view(),name="ai_page"),
 
-    # path('', main_account, name='main_account'),
+
 ]
