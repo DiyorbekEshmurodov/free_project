@@ -31,8 +31,10 @@ def get_user_profile(user):
 
 
 def user_has_profile(user) -> bool:
-    """Faqat mavjudligini tekshirish kerak bo'lgan joylar uchun (masalan
-    context_processor) — to'liq obyektni yuklamasdan, tezroq."""
     if not user or not user.is_authenticated:
         return False
     return UserDetail.objects.filter(Q(user=user) | Q(telegram_user=user)).exists()
+
+def invalidate_user_profile_cache(user):
+    if user and user.is_authenticated:
+        cache.delete(f"user_profile_{user.id}")

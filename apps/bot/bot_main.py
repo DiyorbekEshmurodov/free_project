@@ -15,7 +15,7 @@ from asgiref.sync import sync_to_async
 from django.contrib.auth.models import User
 from django.core.signing import TimestampSigner
 from django.db import IntegrityError
-
+from apps.accounts.services import invalidate_user_profile_cache
 from apps.accounts.models import UserDetail
 from . import globals
 from .states import LoginStates
@@ -80,6 +80,7 @@ def save_user_registration_data(telegram_id, username_input, password, data):
     user_detail.last_name = data.get('last_name')
     user_detail.phone_number = data.get('phone_number')
     user_detail.save()
+    invalidate_user_profile_cache(user)
 
 
 @main_router.message(Command('start'))

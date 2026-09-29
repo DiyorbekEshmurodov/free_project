@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import *
+from .views import cards_list_view, card_detail_view
 from apps.accounts.views import index_page
 
 urlpatterns = [

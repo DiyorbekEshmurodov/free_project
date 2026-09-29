@@ -9,7 +9,7 @@ from django.contrib.auth.models import User
 
 from .models import UserDetail
 from .forms import UserDetailForm
-from .services import get_user_profile
+from .services import get_user_profile , invalidate_user_profile_cache
 
 
 def _get_client_ip(request):
@@ -93,6 +93,7 @@ def profile_setup(request):
         form = UserDetailForm(request.POST, request.FILES, instance=profile)
         if form.is_valid():
             form.save()
+            invalidate_user_profile_cache(request.user)
             request.user.first_name = form.cleaned_data.get('first_name') or request.user.first_name
             request.user.last_name = form.cleaned_data.get('last_name') or request.user.last_name
             request.user.save(update_fields=['first_name', 'last_name'])

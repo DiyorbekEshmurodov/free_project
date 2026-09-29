@@ -3,15 +3,16 @@ from django.http import Http404
 from django.contrib.auth.decorators import login_required
 
 from .services import get_cached_llm_completion
-from .models import UserQuestion, AICard
+from .models import UserQuestion
 from .prompts import SECTION_MAP
 from apps.accounts.models import UserDetail
+from apps.accounts.services import get_user_profile
 
 
 @login_required
 def cards_list_view(request, card_id):
     """1. Barcha kartalar ro'yxatini ko'rish view'si."""
-    card = get_object_or_404(AICard, id=card_id)
+    card = get_object_or_404(id=card_id)
 
     # A1: question_data va None tekshiruvi
     question_data = card.get_question_data()
@@ -40,7 +41,7 @@ def card_detail_view(request, section_name, question_id):
     if question_data is None:
         raise Http404('Bunday savol topilmadi')
 
-    profil = UserDetail.objects.filter(user=request.user).first()
+    profil = get_user_profile(request.user)
     user_info = UserQuestion.objects.filter(user=request.user).last()
 
     buyi = getattr(profil, 'buyi', None) or getattr(user_info, 'buyi', None) or 170
