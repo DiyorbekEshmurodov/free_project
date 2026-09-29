@@ -9,8 +9,9 @@ from aiogram import Router, types, F
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeyboardRemove, ReplyKeyboardMarkup, \
     KeyboardButton
 from aiogram.filters import Command
-from aiogram.fsm.context import FSMContext
 from asgiref.sync import sync_to_async
+from aiogram.fsm.context import FSMContext
+
 
 from django.contrib.auth.models import User
 from django.core.signing import TimestampSigner
