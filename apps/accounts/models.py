@@ -15,6 +15,8 @@ class UserDetail(models.Model):
 
     buyi = models.FloatField(null=True, blank=True)
     vazni = models.FloatField(null=True, blank=True)
+    jinsi = models.CharField(max_length=10, null=True, blank=True)
+    maqsadi = models.CharField(max_length=30, null=True, blank=True)
     last_login = models.DateTimeField(null=True, blank=True)
     avatar = models.ImageField(upload_to='avatars/', null=True, blank=True)
 

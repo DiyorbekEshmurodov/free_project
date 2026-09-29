@@ -19,7 +19,7 @@ def cards_list_view(request, card_id):
     if question_data is None:
         raise Http404("So'ralgan savol ma'lumotlari topilmadi.")
 
-    profil = UserDetail.objects.filter(user=request.user).first()
+    profil = get_user_profile(request.user)
 
     ctx = {
         'card': card,
