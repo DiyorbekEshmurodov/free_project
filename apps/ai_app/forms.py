@@ -1,11 +1,10 @@
 from django import forms
-from .models import *
+from .models import UserQuestion
 class UserForm(forms.ModelForm):
     class Meta:
         model = UserQuestion
-        fields = '__all__'
+        fields = ['title', 'text']
         widgets = {
-            'buyi': forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'Bo\'yingiz (sm)'}),
-            'vazni': forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'Vazningiz (kg)'}),
-            'maqsadi': forms.TextInput(attrs={'class': 'form-control'}),
+            'title': forms.TextInput(attrs={'class': 'form-control'}),
+            'text': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
         }

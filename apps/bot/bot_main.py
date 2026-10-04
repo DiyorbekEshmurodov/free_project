@@ -13,11 +13,11 @@ from asgiref.sync import sync_to_async
 from aiogram.fsm.context import FSMContext
 
 
+from django.conf import settings
 from django.contrib.auth.models import User
 from django.core.signing import TimestampSigner
-from django.db import IntegrityError
-from apps.accounts.services import invalidate_user_profile_cache
 from apps.accounts.models import UserDetail
+from apps.accounts.services import UsernameTakenError, register_telegram_user
 from . import globals
 from .states import LoginStates
 
@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 def build_auto_login_url(telegram_id: int) -> str:
     """B2: Salt bilan himoyalangan auto-login URL generatori."""
     signed_token = signer.sign(str(telegram_id))
-    return f"https://lifegym-kapp.onrender.com/auto-login/{signed_token}/"
+    return f"{settings.SITE_URL.rstrip('/')}/auto-login/{signed_token}/"
 
 
 phone_keyboard = ReplyKeyboardMarkup(
@@ -51,37 +51,12 @@ def check_username_exists(username):
 
 @sync_to_async
 def save_user_registration_data(telegram_id, username_input, password, data):
-    """B3: Mavjud foydalanuvchi parolini ustidan yozmasdan ro'yxatdan o'tkazish."""
-    user_detail = UserDetail.objects.filter(telegram_id=telegram_id).first()
+    """Ro'yxatdan o'tkazish mantiqi accounts.services da (testlanadigan joyda).
 
-    if user_detail and user_detail.user:
-        # B3: Foydalanuvchi parolini O'ZGARTIRMAYMIZ, faqat ism-familiyasini yangilaymiz
-        user = user_detail.user
-        user.first_name = data.get('first_name', user.first_name)
-        user.last_name = data.get('last_name', user.last_name)
-        user.save(update_fields=['first_name', 'last_name'])
-    else:
-        try:
-            user = User.objects.create_user(
-                username=username_input,
-                password=password,
-                first_name=data.get('first_name', ''),
-                last_name=data.get('last_name', '')
-            )
-        except IntegrityError:
-            # Username band bo'lsa parolini ezib tashlamaymiz
-            user = User.objects.get(username=username_input)
-
-        if user_detail is None:
-            user_detail, _ = UserDetail.objects.get_or_create(user=user)
-
-    user_detail.telegram_id = telegram_id
-    user_detail.user = user
-    user_detail.first_name = data.get('first_name')
-    user_detail.last_name = data.get('last_name')
-    user_detail.phone_number = data.get('phone_number')
-    user_detail.save()
-    invalidate_user_profile_cache(user)
+    Username band bo'lsa UsernameTakenError ko'tariladi, mavjud hisobga
+    Telegram ID BOG'LANMAYDI.
+    """
+    return register_telegram_user(telegram_id, username_input, password, data)
 
 
 @main_router.message(Command('start'))
@@ -131,6 +106,9 @@ async def phone_number(message: types.Message, state: FSMContext):
 @main_router.message(LoginStates.username, F.text)
 async def process_username(message: types.Message, state: FSMContext):
     username = message.text.strip()
+    if not username:
+        await message.answer("Login bo'sh bo'lishi mumkin emas. Iltimos, login kiriting:")
+        return
     is_exists = await check_username_exists(username)
     if is_exists:
         await message.answer("Ushbu login band! Iltimos, boshqa login kiriting:")
@@ -183,8 +161,18 @@ async def process_password(message: types.Message, state: FSMContext):
             parse_mode="Markdown"
         )
 
-    except Exception as e:
-        logger.error(f"Foydalanuvchini ro'yxatdan o'tkazishda xatolik: {e}")
+    except UsernameTakenError:
+        # Tekshiruv va yozuv orasida login band bo'lib qoldi (poyga holati).
+        # Mavjud hisobni ishlatmaymiz: ro'yxatdan o'tishni rad etib, yangi login so'raymiz.
+        try:
+            await message.delete()
+        except Exception:
+            pass
+        await state.update_data(username=None)
+        await state.set_state(LoginStates.username)
+        await message.answer("Ushbu login band! Iltimos, boshqa login kiriting:")
+    except Exception:
+        logger.exception("Foydalanuvchini ro'yxatdan o'tkazishda xatolik")
         await message.answer("❌ Saqlashda xatolik yuz berdi. Iltimos, qaytadan urinib ko'ring.")
 
 

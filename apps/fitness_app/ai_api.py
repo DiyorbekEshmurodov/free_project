@@ -1,72 +1,80 @@
 import json
-import os
 import logging
-from groq import Groq
+
 from django.conf import settings
+
+from apps.ai_app.llm import cached_completion
 
 logger = logging.getLogger(__name__)
 
 PERIOD_LABELS = {'daily': 'kunlik', 'weekly': 'haftalik', 'monthly': 'oylik', 'yearly': 'yillik'}
+ADVICE_KEYS = ('nutrition', 'workout', 'ai_recommendation', 'timeline')
+DISCLAIMER = "Bu umumiy ma'lumot; natija odamga qarab farq qiladi. Sog'liq bilan bog'liq savollar bo'lsa, shifokor bilan maslahatlashing."
+
+FALLBACK_TEXTS = {
+    'weight_loss': {
+        'nutrition': "Sabzavot, oqsilli mahsulotlar va yetarli suvni ratsioningizga kiriting; shakarli ichimliklar va ortiqcha shirinliklarni kamaytirishga harakat qiling.",
+        'workout': "Haftasiga bir necha marta yengil kardio (yurish, yugurish) va umumiy kuch mashqlarini bosqichma-bosqich boshlang.",
+        'ai_recommendation': "Barqaror uyqu va tartibli ovqatlanish metabolizm uchun muhim. Keskin cheklovlardan saqlaning.",
+        'timeline': "Natija sur'ati odamga qarab farq qiladi; sekin va barqaror o'zgarish odatda uzoq muddatda yaxshiroq saqlanadi.",
+    },
+    'muscle_gain': {
+        'nutrition': "Har bir taomda yetarli oqsil (go'sht, baliq, tuxum, dukkaklilar) va umumiy kaloriyani ehtiyojingizga moslab oshirishni ko'rib chiqing.",
+        'workout': "Bazaviy kuch mashqlarini texnikaga e'tibor berib, o'zingizga mos og'irlikda bajaring; mashq orasida yetarli dam oling.",
+        'ai_recommendation': "Mushaklar tiklanishi uchun yetarli uyqu va mashqlar orasida dam kunlari kerak.",
+        'timeline': "Mushak o'sishi sekin kechadi va individual; muntazamlik natijadan muhimroq ko'rsatkich.",
+    },
+    'stamina': {
+        'nutrition': "Mevalar, ko'katlar, to'liq donli mahsulotlar va yetarli suyuqlik kun davomida energiyani qo'llab-quvvatlashi mumkin.",
+        'workout': "Yengil intensivlikdan boshlab yurish yoki yugurish masofasini asta-sekin oshiring; intervalli mashqlarni ehtiyotkorlik bilan kiriting.",
+        'ai_recommendation': "Mashq paytida o'zingizni nazorat qiling; bosh aylanishi yoki og'riq bo'lsa to'xtating va shifokorga murojaat qiling.",
+        'timeline': "Chidamlilik odatda bir necha hafta muntazam mashqdan keyin sezila boshlaydi, lekin sur'ati har kimda har xil.",
+    },
+    'health_habits': {
+        'nutrition': "Qayta ishlangan taomlarni kamaytirib, ratsionga ko'proq yangi sabzavot va meva qo'shishga harakat qiling.",
+        'workout': "Kundalik yurish va ertalabki yengil badan tarbiya kabi kichik odatlardan boshlang.",
+        'ai_recommendation': "Har kuni taxminan bir xil vaqtda uxlash va uyg'onish odatlarni mustahkamlashga yordam beradi.",
+        'timeline': "Odat shakllanishi vaqt oladi; kichik, bajarish oson qadamlar uzoq muddatda yaxshi ishlaydi.",
+    },
+}
 
 
 def _fallback_advice(profile, card_id, period):
-    """GROQ_API_KEY sozlanmagan yoki API xatolik bergan holatlar uchun zaxira matn."""
-    vazni = getattr(profile, 'vazni', '70') if profile else '70'
-    buyi = getattr(profile, 'buyi', '175') if profile else '175'
-    try:
-        vazn_num = float(vazni)
-    except (ValueError, TypeError):
-        vazn_num = 70.0
-
+    """AI mavjud bo'lmaganda ehtiyotkor, kafolatsiz umumiy matn."""
     p_name = PERIOD_LABELS.get(period, 'haftalik')
-
-    if card_id == 'weight_loss':
-        return {
-            'nutrition': f"Sizning {p_name} ratsioningiz: Kuniga kamida {vazn_num * 35 / 1000:.1f}L suv iching. Shirinlik va xamir ovqatlarni butunlay cheklab, har bir taomlanishda 30g oqsil (tovuq go'shti, tuxum, tvorog) va murakkab uglevodlar (guruch, grechka) iste'mol qiling.",
-            'workout': f"Sizning {p_name} mashg'ulot rejangiz: Boshlanishiga {p_name} 3-4 marta kardio (30 daqiqa yugurish yoki tez yurish) hamda umumiy tana mushaklarini mustahkamlovchi yengil kuch mashqlarini bajaring.",
-            'ai_recommendation': f"Bo'yingiz {buyi} sm va vazningiz {vazni} kg bo'lgani uchun, metabolizmni ushlab turish muhim. Oqsillar balansi va 8 soatlik sifatli uyqu {p_name} rejangizning asosiy kalitidir.",
-            'timeline': f"Ushbu {p_name} rejaga qat'iy amal qilsangiz, belgilangan vaqt davomida yog' foizini 2-4% ga kamaytirish va umumiy energiyani oshirish kafolatlanadi."
-        }
-    elif card_id == 'muscle_gain':
-        return {
-            'nutrition': f"Sizning {p_name} gipertrofiya ratsioningiz: Kunlik {vazn_num * 1.8:.0f}g oqsil qabul qiling. Kaloriya miqdorini normadan 300 kcal ga oshiring. Mol go'shti, baliq, tuxum va yong'oqlarga urg'u bering.",
-            'workout': f"Sizning {p_name} mashg'ulot rejangiz: Og'ir vaznlar bilan 8-12 marta qaytariladigan bazaviy mashqlarni bajaring (Jim leja, Pritsed, Stanovaya tyaga). Har bir mashq orasida 2 daqiqa dam oling.",
-            'ai_recommendation': f"Vazn {vazni} kg ko'rsatkichida mushak o'sishi uchun har bir mushak guruhiga mashqdan so'ng kamida 48 soat tiklanish vaqti bering.",
-            'timeline': f"{p_name.capitalize()} natija: Mushak hajmining sezilarli darajada kattalashishi hamda kuch ko'rsatkichlarining 15-20% ga oshishi."
-        }
-    elif card_id == 'stamina':
-        return {
-            'nutrition': f"Sizning {p_name} energiya ratsioningiz: Antioksidantlarga boy mahsulotlar (suyak sho'rva, mevalar, ko'katlar) va yetarli miqdorda kaliy/magniy moddalarini qabul qiling.",
-            'workout': f"Sizning {p_name} mashq rejangiz: Tabata va HIIT (Yuqori intensivli) mashqlarini bajaring. Yugurish masofasini va sur'atini {p_name} bosqichma-bosqich oshirib boring.",
-            'ai_recommendation': "Nafas olish va yurak urish maromini (puls) nazorat qiling. Mashq paytida suvsizlanishga yo'l qo'ymang.",
-            'timeline': f"{p_name.capitalize()} natija: Nafas qisishi yo'qolishi, quvvat darajasi va chidamlilikning maksimumga chiqishi."
-        }
-    else:  # health_habits
-        return {
-            'nutrition': f"Sizning {p_name} sog'lom ratsioningiz: Ishlov berilgan (fast-food, gazli ichimliklar) mahsulotlarni to'xtating. Har bir taomga yangi uzilgan sabzavotlar qo'shing.",
-            'workout': f"Sizning {p_name} odat rejangiz: Kuniga kamida 8,000-10,000 qadam piyoda yuring, ertalabki 10 daqiqalik badan tarbiya va stretching mashqlarini bajaring.",
-            'ai_recommendation': "Kun tartibiga amal qiling: Har kuni bir xil vaqtda uxlash va bir xil vaqtda uyg'onishni odat qiling.",
-            'timeline': f"{p_name.capitalize()} natija: Uyqu sifatining yaxshilanishi, hazm qilish tizimi normallashishi va kayfiyat barqarorligi."
-        }
+    texts = dict(FALLBACK_TEXTS.get(card_id, FALLBACK_TEXTS['health_habits']))
+    texts['nutrition'] = f"({p_name.capitalize()} reja) {texts['nutrition']}"
+    texts['timeline'] = f"{texts['timeline']} {DISCLAIMER}"
+    return texts
 
 
-def generate_user_advice(profile, card_id, period):
+def _parse_advice(raw):
+    """Model javobini JSON sifatida o'qiydi; noto'g'ri bo'lsa None."""
+    try:
+        data = json.loads(raw)
+    except (TypeError, ValueError):
+        return None
+    if not isinstance(data, dict) or not all(isinstance(data.get(k), str) for k in ADVICE_KEYS):
+        return None
+    return {k: data[k] for k in ADVICE_KEYS}
+
+
+def generate_user_advice(profile, card_id, period, user_id=None):
+    """Groq orqali maslahat oladi (kesh + kunlik kvota bilan).
+
+    Natija JSON bo'lmasa, kalit yo'q bo'lsa yoki limit tugasa model
+    chaqirilmaydi / zaxira matn qaytadi. Zaxira matn hech qanday natijani
+    kafolatlamaydi.
     """
-    Groq API orqali maslahat oladi.
-    Argumentlar va xatoliklar to'g'rilangan versiya.
-    """
-    buyi = getattr(profile, 'buyi', 'Nomalum') if profile else 'Nomalum'
-    vazni = getattr(profile, 'vazni', 'Nomalum') if profile else 'Nomalum'
-    maqsadi = getattr(profile, 'maqsadi', 'Nomalum') if profile else 'Nomalum'
+    buyi = getattr(profile, 'buyi', None) or 'Nomalum'
+    vazni = getattr(profile, 'vazni', None) or 'Nomalum'
+    maqsadi = getattr(profile, 'maqsadi', None) or 'Nomalum'
 
-    api_key = getattr(settings, 'GROQ_API_KEY', None) or os.getenv("GROQ_API_KEY")
-
-    if not api_key:
+    if not getattr(settings, 'GROQ_API_KEY', None):
         logger.warning("GROQ_API_KEY topilmadi. Zaxira matnga o'tilmoqda.")
         return _fallback_advice(profile, card_id, period)
 
     prompt = f"""
-        Men(AI) professional fitness va ovqatlanish bo'yicha sun'iy intellekt murabbiyisiman.
         Foydalanuvchi ma'lumotlari:
         - Bo'yi: {buyi} cm
         - Vazni: {vazni} kg
@@ -74,38 +82,22 @@ def generate_user_advice(profile, card_id, period):
         - Tanlangan yo'nalish (karta): {card_id}
         - Davriylik: {period}
 
+        Umumiy, ehtiyotkor tavsiya bering. Natijani kafolatlamang, aniq tibbiy tashxis qo'ymang.
         Javobni FAQAT quyidagi JSON formatida qaytaring:
         {{
-            "nutrition": "Foydalanuvchining bo'yi, vazni va maqsadi uchun aniq kaloriya, oqsil hamda suv miqdori bo'yicha tavsiya",
-            "workout": "Ushbu maqsad va davr uchun mos keladigan aniq mashqlar va ularning takrorlanishlar soni",
-            "ai_recommendation": "Tiklanish, uyqu va natijaga erishish bo'yicha muhim maslahat",
-            "timeline": "Kutilayotgan natija va muddatlar"
+            "nutrition": "ovqatlanish bo'yicha umumiy tavsiya",
+            "workout": "mos mashqlar",
+            "ai_recommendation": "tiklanish va uyqu bo'yicha maslahat",
+            "timeline": "kutilayotgan jarayon (kafolatsiz)"
         }}
     """
+    messages = [
+        {"role": "system", "content": "Siz fitness bo'yicha yordamchisiz. Javobingiz faqat so'ralgan JSON formatida bo'lishi shart."},
+        {"role": "user", "content": prompt},
+    ]
 
-    try:
-        client = Groq(api_key=api_key)
-
-        response = client.chat.completions.create(
-            model="openai/gpt-oss-120b",
-            messages=[
-                {
-                    "role": "system",
-                    "content": "Siz professional fitness murabbiyisiz. Javobingiz faqat so'ralgan JSON formatida bo'lishi shart."
-                },
-                {
-                    "role": "user",
-                    "content": prompt
-                }
-            ],
-            response_format={"type": "json_object"},
-            temperature=0.5,
-            timeout=8.0  # API qotib qolishining oldini olish uchun taymout
-        )
-
-        advice_json = json.loads(response.choices[0].message.content)
-        return advice_json
-
-    except Exception as e:
-        logger.error(f"Groq API Xatolik: {e}")
-        return _fallback_advice(profile, card_id, period)
+    raw = cached_completion(
+        'advice', prompt, messages, user_id=user_id,
+        response_format={"type": "json_object"}, temperature=0.5,
+    )
+    return _parse_advice(raw) or _fallback_advice(profile, card_id, period)

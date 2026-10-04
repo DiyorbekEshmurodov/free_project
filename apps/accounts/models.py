@@ -1,13 +1,17 @@
-from django.db import models
 from django.contrib.auth.models import User
+from django.db import models
 from django.templatetags.static import static
 
 
 class UserDetail(models.Model):
-    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='detail', db_index=True,null=True,
-        blank=True)
+    user = models.OneToOneField(
+        User, on_delete=models.CASCADE, related_name='detail',
+        db_index=True, null=True, blank=True,
+    )
     telegram_id = models.BigIntegerField(unique=True, null=True, blank=True, db_index=True)
-    telegram_user = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='tg_detail')
+    telegram_user = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True, related_name='tg_detail',
+    )
 
     first_name = models.CharField(max_length=100, null=True, blank=True)
     last_name = models.CharField(max_length=100, null=True, blank=True)
@@ -15,8 +19,10 @@ class UserDetail(models.Model):
 
     buyi = models.FloatField(null=True, blank=True)
     vazni = models.FloatField(null=True, blank=True)
-    jinsi = models.CharField(max_length=10, null=True, blank=True)
-    maqsadi = models.CharField(max_length=30, null=True, blank=True)
+    # 0002 migratsiya bu ustunlarni o'chirgan edi, lekin forma, AI va testlar
+    # ularni ishlatadi. 0004 migratsiya ularni qaytaradi (model == migratsiya).
+    jinsi = models.CharField(max_length=100, null=True, blank=True)
+    maqsadi = models.CharField(max_length=100, null=True, blank=True)
     last_login = models.DateTimeField(null=True, blank=True)
     avatar = models.ImageField(upload_to='avatars/', null=True, blank=True)
 
@@ -27,8 +33,8 @@ class UserDetail(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.user.username} Profili"
-
+        username = self.user.username if self.user_id else "Noma'lum"
+        return f"{username} - Profili"
 
     @property
     def avatar_url(self):
@@ -40,7 +46,10 @@ class UserDetail(models.Model):
     def is_profile_complete(self):
         return bool(self.buyi and self.vazni)
 
+
+class UsedLoginToken(models.Model):
+    token_hash = models.CharField(max_length=64, unique=True)
+    used_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
     def __str__(self):
-        return f"{self.user.username} - Profili"
-
-
+        return f"{self.token_hash[:12]}... ({self.used_at:%Y-%m-%d %H:%M})"

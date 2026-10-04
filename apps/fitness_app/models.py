@@ -1,9 +1,7 @@
 from django.db import models
+
 from apps.accounts.models import UserDetail
-from django.contrib.auth.models import User
-from django.db.models.signals import post_save
-from django.dispatch import receiver
-from django.core.exceptions import ObjectDoesNotExist
+
 
 class FitnessPlan(models.Model):
     PERIOD_CHOICES = (
@@ -21,27 +19,9 @@ class FitnessPlan(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        # Xavfsiz usul: user yoki telegram_user username-ini olish
         username = "Noma'lum"
-        if self.user and self.user.user:
+        if self.user.user_id:
             username = self.user.user.username
-        elif self.user and hasattr(self.user, 'telegram_user') and self.user.telegram_user:
+        elif self.user.telegram_user_id:
             username = self.user.telegram_user.username
-
         return f"{username} - {self.title} ({self.period_type})"
-
-@receiver(post_save, sender=User)
-def create_user_profile(sender, instance, created, **kwargs):
-    if created:
-        UserDetail.objects.get_or_create(user=instance)
-
-@receiver(post_save, sender=User)
-def save_user_profile(sender, instance, **kwargs):
-    try:
-        if hasattr(instance, 'profil'):
-            instance.profil.save()
-    except ObjectDoesNotExist:
-        pass
-
-
-

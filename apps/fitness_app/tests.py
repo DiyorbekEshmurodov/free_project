@@ -1,94 +1,140 @@
-from django.test import TestCase
-from django.contrib.auth import get_user_model
-from django.urls import reverse
-from rest_framework import status
-from unittest.mock import patch
-from apps.fitness_app.models import FitnessPlan
-from apps.accounts.models import UserDetail
+import json
 from datetime import date
+from unittest.mock import patch
+
+from django.contrib.auth import get_user_model
+from django.core.cache import cache
+from django.test import TestCase, override_settings
+from django.urls import reverse
+
+from apps.accounts.models import UserDetail
+from apps.fitness_app import ai_api
+from apps.fitness_app.models import FitnessPlan
 
 User = get_user_model()
 
+ADVICE = {'nutrition': 'N', 'workout': 'W', 'ai_recommendation': 'R', 'timeline': 'T'}
 
-class FitnessModelTest(TestCase):
+
+class FitnessBase(TestCase):
     def setUp(self):
-        self.user_data = {
-            'username': 'testusername',
-            'password': 'strongpassword1234',
-        }
-        self.user = User.objects.create_user(**self.user_data)
-        self.client.force_login(self.user)
+        cache.clear()
+        self.user = User.objects.create_user(username='testusername', password='strongpassword1234')
+        self.detail = UserDetail.objects.get(user=self.user)
+        self.detail.buyi, self.detail.vazni = 175.0, 70.0
+        self.detail.save()
 
-        self.user_detail = UserDetail.objects.get(user=self.user)
-
-        self.hisobot = FitnessPlan.objects.create(
-            user=self.user_detail,
-            title='Yangilangan Reja Nomi',
-            description='Ertalabki 5 km yugurish',
-            period_type='daily',
-            target_date=date.today(),
-            is_completed=False
+        self.plan = FitnessPlan.objects.create(
+            user=self.detail, title='Yangilangan Reja Nomi', description='Ertalabki 5 km yugurish',
+            period_type='daily', target_date=date.today(), is_completed=False,
         )
 
-        self.other_user = User.objects.create_user(username='otheruser', password='PassWord123!')
-        self.other_user = UserDetail.objects.get(user=self.other_user)
+        self.other = User.objects.create_user(username='otheruser', password='PassWord123!')
+        self.other_detail = UserDetail.objects.get(user=self.other)
+        self.other_plan = FitnessPlan.objects.create(
+            user=self.other_detail, title='Begona reja', period_type='daily', target_date=date.today(),
+        )
+        self.client.force_login(self.user)
 
-    def _get_url(self, name, *args):
-        """URL oxirida slesh (/) bo'lishini kafolatlaydi."""
-        url = reverse(name, args=args) if args else reverse(name)
-        if not url.endswith('/'):
-            url += '/'
-        return url
-
-    def test_hisobot_list(self):
-        url = self._get_url('user_list')
-        response = self.client.get(url, follow=True)
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-
-    def test_hisobot_create(self):
-        url = self._get_url('user_create')
+    def payload(self, **extra):
         data = {
-            'title': 'Yangi Reja Kiritish',
-            'description': 'Test tavsifi',
-            'period_type': 'daily',
-            'target_date': str(date.today()),
-            'is_completed': False
+            'title': 'Yangi Reja', 'description': 'Tavsif', 'period_type': 'daily',
+            'target_date': str(date.today()), 'is_completed': '',
         }
-        response = self.client.post(url, data, follow=True)
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        data.update(extra)
+        return data
 
-    def test_hisobot_update(self):
-        url = self._get_url('user_edit', self.hisobot.pk)
-        data = {
-            'title': 'Yangilangan Reja Nomi',
-            'description': self.hisobot.description,
-            'period_type': self.hisobot.period_type,
-            'target_date': str(self.hisobot.target_date),
-            'is_completed': True
-        }
-        response = self.client.post(url, data, follow=True)
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
 
-    def test_hisobot_delete(self):
-        url = self._get_url('user_delete', self.hisobot.pk)
-        response = self.client.post(url)
-        print("DEBUG:", response.status_code, response.headers.get('Location'))
-        self.assertEqual(response.status_code, status.HTTP_302_FOUND)
-        self.assertEqual(FitnessPlan.objects.filter(pk=self.hisobot.pk).count(), 0)
+class PlanCrudTests(FitnessBase):
+    def test_list_shows_only_own_plans(self):
+        response = self.client.get(reverse('user_list'))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(list(response.context['plans']), [self.plan])
 
-    def test_idor_protection_other_user_cannot_delete(self):
-        self.client.force_login(self.other_user)
-        url = self._get_url('user_delete', self.hisobot.pk)
-        self.client.post(url, follow=True)
-        self.assertEqual(FitnessPlan.objects.filter(pk=self.hisobot.pk).count(), 1)
+    def test_create_plan(self):
+        response = self.client.post(reverse('user_create'), self.payload(title='Mening rejam'))
+        self.assertRedirects(response, reverse('user_list'), fetch_redirect_response=False)
+        self.assertTrue(FitnessPlan.objects.filter(user=self.detail, title='Mening rejam').exists())
 
-    @patch('apps.fitness_app.views.ai_generate_advice')
-    def test_ai_page_view(self, mock_advice):
-        mock_advice.return_value = {
-            'nutrition': 'Test', 'workout': 'Test',
-            'ai_recommendation': 'Test', 'timeline': 'Test',
-        }
-        url = self._get_url('ai_page')
-        response = self.client.get(url, {'card': 'weight_loss', 'period': 'weekly'})
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
+    def test_edit_plan(self):
+        response = self.client.post(reverse('user_edit', args=[self.plan.pk]), self.payload(is_completed='on'))
+        self.assertEqual(response.status_code, 302)
+        self.plan.refresh_from_db()
+        self.assertTrue(self.plan.is_completed)
+
+    def test_delete_requires_post(self):
+        url = reverse('user_delete', args=[self.plan.pk])
+        self.assertEqual(self.client.get(url).status_code, 405)
+        self.assertTrue(FitnessPlan.objects.filter(pk=self.plan.pk).exists())
+
+    def test_delete_with_post(self):
+        response = self.client.post(reverse('user_delete', args=[self.plan.pk]))
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(FitnessPlan.objects.filter(pk=self.plan.pk).exists())
+
+    def test_other_user_cannot_delete_or_edit(self):
+        self.client.force_login(self.other)
+        self.assertEqual(self.client.post(reverse('user_delete', args=[self.plan.pk])).status_code, 404)
+        self.assertEqual(self.client.post(reverse('user_edit', args=[self.plan.pk]), self.payload()).status_code, 404)
+        self.assertTrue(FitnessPlan.objects.filter(pk=self.plan.pk, title='Yangilangan Reja Nomi').exists())
+
+    def test_anonymous_is_redirected_to_login(self):
+        self.client.logout()
+        response = self.client.get(reverse('user_list'))
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(reverse('login_page'), response['Location'])
+
+    def test_user_without_profile_is_sent_to_profile_setup(self):
+        lonely = User.objects.create_user(username='lonely', password='StrongPass123!')
+        UserDetail.objects.filter(user=lonely).delete()
+        self.client.force_login(lonely)
+        response = self.client.get(reverse('user_list'))
+        self.assertRedirects(response, reverse('profile_setup'), fetch_redirect_response=False)
+
+    def test_plan_str_is_safe(self):
+        self.assertIn('testusername', str(self.plan))
+
+
+class AIPageTests(FitnessBase):
+    @patch('apps.fitness_app.views.ai_generate_advice', return_value=ADVICE)
+    def test_ai_page_view_passes_user_for_quota(self, mock_advice):
+        response = self.client.get(reverse('ai_page'), {'card': 'weight_loss', 'period': 'weekly'})
+        self.assertEqual(response.status_code, 200)
         mock_advice.assert_called_once()
+        self.assertEqual(mock_advice.call_args[0][0].user.pk, self.user.pk)
+
+    @patch('apps.fitness_app.views.ai_generate_advice', return_value=ADVICE)
+    def test_invalid_query_params_fall_back_to_whitelist(self, mock_advice):
+        response = self.client.get(reverse('ai_page'), {'card': '<script>', 'period': 'x'})
+        self.assertEqual(response.context['selected_card'], 'weight_loss')
+        self.assertEqual(response.context['selected_period'], 'weekly')
+
+
+class AIAdviceServiceTests(TestCase):
+    def setUp(self):
+        cache.clear()
+
+    def test_fallback_never_guarantees_results(self):
+        for card in ('weight_loss', 'muscle_gain', 'stamina', 'health_habits'):
+            for value in ai_api._fallback_advice(None, card, 'weekly').values():
+                self.assertNotIn('kafolatlan', value.lower())
+                self.assertNotIn('butunlay', value.lower())
+
+    @override_settings(GROQ_API_KEY=None)
+    def test_no_key_uses_fallback_without_model_call(self):
+        with patch('apps.fitness_app.ai_api.cached_completion') as completion:
+            result = ai_api.generate_user_advice(None, 'stamina', 'daily', user_id=1)
+        completion.assert_not_called()
+        self.assertEqual(set(result), set(ai_api.ADVICE_KEYS))
+
+    @override_settings(GROQ_API_KEY='test-key')
+    def test_valid_json_is_returned(self):
+        with patch('apps.fitness_app.ai_api.cached_completion', return_value=json.dumps(ADVICE)):
+            self.assertEqual(ai_api.generate_user_advice(None, 'stamina', 'daily', user_id=1), ADVICE)
+
+    @override_settings(GROQ_API_KEY='test-key')
+    def test_invalid_json_or_quota_message_uses_fallback(self):
+        for bad in ('quota tugadi', '{"nutrition": 1}', ''):
+            with patch('apps.fitness_app.ai_api.cached_completion', return_value=bad):
+                result = ai_api.generate_user_advice(None, 'stamina', 'daily', user_id=1)
+            self.assertEqual(set(result), set(ai_api.ADVICE_KEYS))

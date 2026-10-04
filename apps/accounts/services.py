@@ -1,20 +1,30 @@
+"""Accounts uchun umumiy servis funksiyalar.
+
+Bu yerda Django'ga bog'liq, lekin aiogram/HTTP'ga bog'liq bo'lmagan mantiq
+turadi. Shu sababli botdagi ro'yxatdan o'tish va bir martalik tokenni
+oddiy Django testlari bilan tekshirish mumkin.
 """
-Butun loyiha bo'ylab UserDetail profilini topish uchun UMUMIY yordamchi
-funksiya. Ilgari bir xil "user= bo'yicha, topilmasa telegram_user= bo'yicha
-izlash" mantiqi accounts/views.py, fitness_app/views.py (4 marta) va
-context_processors.py fayllarida alohida-alohida, har birida kamida
-1-2 ta DB so'rovi bilan takrorlanardi. Endi bitta joyda, select_related
-bilan bitta so'rovda ishlaydi.
-"""
-from django.db.models import Q
+import hashlib
+from datetime import timedelta
+
+from django.contrib.auth.models import User
 from django.core.cache import cache
-from .models import UserDetail
+from django.db import IntegrityError, transaction
+from django.db.models import Q
+from django.utils import timezone
+
+from .models import UserDetail, UsedLoginToken
+
+PROFILE_CACHE_TTL = 900
+TOKEN_RETENTION = timedelta(days=1)
+
+
+class UsernameTakenError(Exception):
+    """Tanlangan username band: mavjud hisobga hech narsa bog'lanmaydi."""
 
 
 def get_user_profile(user):
-    """
-    Foydalanuvchi profilini keshdan yoki DB dan olish.
-    """
+    """Foydalanuvchi profilini keshdan yoki DB dan olish."""
     if not user or not user.is_authenticated:
         return None
 
@@ -24,8 +34,7 @@ def get_user_profile(user):
     if profile is None:
         profile = UserDetail.objects.filter(user=user).first()
         if profile:
-            # Profilni 15 daqiqaga keshga saqlaymiz
-            cache.set(cache_key, profile, timeout=900)
+            cache.set(cache_key, profile, timeout=PROFILE_CACHE_TTL)
 
     return profile
 
@@ -35,6 +44,82 @@ def user_has_profile(user) -> bool:
         return False
     return UserDetail.objects.filter(Q(user=user) | Q(telegram_user=user)).exists()
 
+
 def invalidate_user_profile_cache(user):
     if user and user.is_authenticated:
         cache.delete(f"user_profile_{user.id}")
+
+
+def consume_login_token(token: str) -> bool:
+    """Tokenni BIR MARTA ishlatilgan deb belgilaydi.
+
+    True  - token birinchi marta ishlatilmoqda (kirishga ruxsat).
+    False - token oldin ishlatilgan (rad etiladi).
+
+    Holat DB da saqlanadi, shuning uchun ko'p workerli Gunicorn'da ham,
+    kesh tozalansa ham, jarayon qayta ishga tushsa ham kafolat saqlanadi.
+    """
+    token_hash = hashlib.sha256(token.encode('utf-8')).hexdigest()
+    try:
+        with transaction.atomic():
+            UsedLoginToken.objects.create(token_hash=token_hash)
+    except IntegrityError:
+        return False
+
+    # Eski yozuvlarni tozalash (token baribir 10 daqiqada eskiradi)
+    UsedLoginToken.objects.filter(used_at__lt=timezone.now() - TOKEN_RETENTION).delete()
+    return True
+
+
+def register_telegram_user(telegram_id, username, password, data):
+    """Telegram orqali ro'yxatdan o'tkazish (poygadan xavfsiz).
+
+    Qoidalar:
+    * Telegram ID allaqachon hisobga bog'langan bo'lsa, faqat ism-familiya
+      yangilanadi (parol o'zgarmaydi).
+    * Yangi User yaratishda username band bo'lsa (poyga holati ham) mavjud
+      User QAYTA ISHLATILMAYDI: UsernameTakenError ko'tariladi.
+    * Hamma amal bitta tranzaksiyada: xato bo'lsa yarim hisob qolmaydi.
+    """
+    with transaction.atomic():
+        detail = (
+            UserDetail.objects.select_related('user')
+            .filter(telegram_id=telegram_id)
+            .first()
+        )
+
+        if detail is not None and detail.user is not None:
+            user = detail.user
+            user.first_name = data.get('first_name', user.first_name)
+            user.last_name = data.get('last_name', user.last_name)
+            user.save(update_fields=['first_name', 'last_name'])
+        else:
+            try:
+                # Ichki atomic = savepoint: IntegrityError tashqi tranzaksiyani buzmaydi
+                with transaction.atomic():
+                    user = User.objects.create_user(
+                        username=username,
+                        password=password,
+                        first_name=data.get('first_name', ''),
+                        last_name=data.get('last_name', ''),
+                    )
+            except IntegrityError:
+                raise UsernameTakenError(username)
+
+            if detail is None:
+                # Signal yaratgan bo'sh profilni olamiz
+                detail, _ = UserDetail.objects.get_or_create(user=user)
+            else:
+                # Foydasiz (user'siz) eski profil bor: signal yaratgan bo'sh
+                # profilni o'chirib, eskisini yangi user'ga biriktiramiz
+                UserDetail.objects.filter(user=user).exclude(pk=detail.pk).delete()
+                detail.user = user
+
+        detail.telegram_id = telegram_id
+        detail.first_name = data.get('first_name')
+        detail.last_name = data.get('last_name')
+        detail.phone_number = data.get('phone_number')
+        detail.save()
+
+    invalidate_user_profile_cache(user)
+    return user

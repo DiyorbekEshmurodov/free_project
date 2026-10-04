@@ -4,6 +4,7 @@
 [![Aiogram](https://img.shields.io/badge/Aiogram-3.x-2CA5E0?style=for-the-badge&logo=telegram&logoColor=white)](https://docs.aiogram.dev/)
 [![Python](https://img.shields.io/badge/Python-3.11+-3776AB?style=for-the-badge&logo=python&logoColor=white)](https://www.python.org/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15+-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![Docker](https://img.shields.io/badge/Docker-Enabled-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
 
 **Life GYM** is an all-in-one digital fitness and health ecosystem that combines web platform capabilities with artificial intelligence (AI) and seamless Telegram Bot integration. It helps users manage their daily workouts, personalize nutrition plans, calculate macronutrients (BJU), and monitor progress effortlessly.
 
@@ -32,6 +33,7 @@
 * **Telegram Bot Framework:** Aiogram 3.x
 * **Database:** PostgreSQL / SQLite
 * **Frontend:** HTML5, CSS3, JavaScript
+* **Containerization:** Docker & Docker Compose
 * **Environment Management:** Python Virtual Environment (`.venv`)
 
 ---
@@ -43,10 +45,15 @@
 Ensure you have the following installed on your local system:
 * Python 3.10+
 * Git
-* Virtual Environment module (`venv`)
+* Docker & Docker Compose (for containerized deployment)
 
-### 1. Clone the Repository
+---
 
-```bash
-git clone [https://github.com/your-username/free-project.git](https://github.com/your-username/free-project.git)
-cd free-project
+### 🐳 Running with Docker Compose (Recommended)
+
+The easiest way to run the entire stack (Django Web App, PostgreSQL Database, and Telegram Bot) is using Docker Compose.
+
+1. **Clone the Repository:**
+   ```bash
+   git clone [https://github.com/your-username/free-project.git](https://github.com/your-username/free-project.git)
+   cd free-project

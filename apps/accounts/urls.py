@@ -1,5 +1,12 @@
 from django.urls import path
-from .views import *
+from .views import (
+    auto_login_view,
+    index_page,
+    login_page,
+    logout_page,
+    main_account,
+    profile_setup,
+)
 urlpatterns = [
     path('',main_account,name='home'),
     path('auto-login/<str:token>/', auto_login_view, name='auto_login'),

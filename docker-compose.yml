@@ -1,17 +1,19 @@
-version: '3.8'
-
 services:
+  redis:
+    image: redis:7-alpine
+    container_name: lifegym_redis
+    restart: always
+
   web:
     build: .
     container_name: lifegym_app
     restart: always
-    # Konteyner ishga tushganda avval migratsiya va static fayllarni yig'adi, so'ng Gunicorn'ni yuritadi
+    # Avval migratsiya va static fayllar, so'ng Gunicorn
     command: >
-      sh -c "python manage.py migrate &&
+      sh -c "python manage.py migrate --noinput &&
              python manage.py collectstatic --noinput &&
              gunicorn --bind 0.0.0.0:8000 --workers 3 config.wsgi:application"
     volumes:
-      - .:/app
       - media_volume:/app/media
       - static_volume:/app/staticfiles
     ports:
@@ -20,6 +22,10 @@ services:
       - .env
     environment:
       - DEBUG=0
+      # Umumiy kesh: login urinishlari, AI kvota va profil keshi barcha workerlarda bir xil
+      - REDIS_URL=redis://redis:6379/1
+    depends_on:
+      - redis
 
   bot:
     build: .
@@ -28,11 +34,14 @@ services:
     command: python manage.py run_bot
     env_file:
       - .env
+    environment:
+      - DEBUG=0
+      - REDIS_URL=redis://redis:6379/1
     volumes:
-      - .:/app
       - media_volume:/app/media
     depends_on:
       - web
+      - redis
 
 volumes:
   media_volume:

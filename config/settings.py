@@ -8,12 +8,12 @@ import sys
 import dotenv
 from decouple import config
 import dj_database_url
-from groq import Groq
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-
-# Apps papkasini importlar uchun qo'shish
-sys.path.insert(0, os.path.join(BASE_DIR, 'apps'))
+# Importlar YAGONA `apps.*` shaklida. `apps/` ni sys.path ga qo'shish olib
+# tashlandi: u bitta modulni ikki nom bilan import qilib, test discovery va
+# signal/model ro'yxatini buzardi.
+TESTING = 'test' in sys.argv
 
 # .env faylini yuklash
 dotenv.load_dotenv(BASE_DIR / '.env')
@@ -24,11 +24,19 @@ SECRET_KEY = config('SECRET_KEY')
 # Debug rejimini tekshirish
 DEBUG = config('DEBUG', default=False, cast=bool)
 
-# Groq API Sozlamasi
-GROQ_API_KEY = config("GROQ_API_KEY", default=None)
-groq_client = None
-if GROQ_API_KEY:
-    groq_client = Groq(api_key=GROQ_API_KEY)
+# Groq API Sozlamasi (klient apps/ai_app/llm.py da kerak bo'lganda yaratiladi)
+GROQ_API_KEY = config("GROQ_API_KEY", default=None) or None
+# Bitta foydalanuvchi uchun kunlik AI so'rovlar limiti (keshdan javob sanalmaydi)
+AI_DAILY_LIMIT = config('AI_DAILY_LIMIT', default=30, cast=int)
+
+# Bot yuboradigan kirish havolasi uchun sayt manzili
+SITE_URL = config('SITE_URL', default='https://lifegym-kapp.onrender.com')
+
+# Ishonchli proksi (Render, nginx) ortida ishlayotgan bo'lsa True qiling
+BEHIND_PROXY = config('BEHIND_PROXY', default=False, cast=bool)
+TRUST_X_FORWARDED_FOR = BEHIND_PROXY
+if BEHIND_PROXY:
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 # Hostlar ro'yxati
 ALLOWED_HOSTS = config(
@@ -76,7 +84,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
-                'fitness_app.context_processors.user_profile_status',
+                'apps.fitness_app.context_processors.user_profile_status',
             ],
         },
     },
@@ -88,12 +96,19 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # Database sozlamasi
 DATABASE_URL = config('DATABASE_URL', default=None)
 
-if DATABASE_URL:
+if TESTING:
+    # Test muhiti: tezkor SQLite, tashqi sozlama (DB_PASSWORD) talab qilinmaydi
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': ':memory:',
+        }
+    }
+elif DATABASE_URL:
     DATABASES = {
         'default': dj_database_url.config(default=DATABASE_URL, conn_max_age=600)
     }
 else:
-    # Standart PostgreSQL sozlamasi
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.postgresql',
@@ -106,13 +121,6 @@ else:
                 'client_encoding': 'UTF8'
             }
         }
-    }
-
-# Test muhiti uchun tezkor SQLite
-if 'test' in sys.argv:
-    DATABASES['default'] = {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': ':memory:',
     }
 
 
@@ -144,7 +152,12 @@ USE_TZ = True
 STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+# Django 5.1+ da STATICFILES_STORAGE o'chirilgan: STORAGES ishlatiladi.
+# Manifest'siz variant tanlandi: yetishmayotgan fayl havolasi 500 bermaydi.
+STORAGES = {
+    'default': {'BACKEND': 'django.core.files.storage.FileSystemStorage'},
+    'staticfiles': {'BACKEND': 'whitenoise.storage.CompressedStaticFilesStorage'},
+}
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
@@ -162,11 +175,10 @@ CSRF_COOKIE_SECURE = config('SECURE_SSL', default=False, cast=bool)
 SESSION_COOKIE_SECURE = config('SECURE_SSL', default=False, cast=bool)
 
 # Production Xavfsizlik sarlavhalari (Browser Himoyasi)
-SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = 'DENY'
 
-if not DEBUG and 'test' not in sys.argv:
+if not DEBUG and not TESTING:
     SECURE_SSL_REDIRECT = config('SECURE_SSL', default=True, cast=bool)
     SESSION_COOKIE_SECURE = config('SECURE_SSL', default=True, cast=bool)
     CSRF_COOKIE_SECURE = config('SECURE_SSL', default=True, cast=bool)
@@ -187,7 +199,7 @@ BOT_TOKEN = config('BOT_TOKEN', default='dummy-bot-token-for-ci')
 # Kesh sozlamasi (Redis / LocMemCache)
 REDIS_URL = config('REDIS_URL', default=None)
 
-if REDIS_URL:
+if REDIS_URL and not TESTING:
     CACHES = {
         'default': {
             'BACKEND': 'django_redis.cache.RedisCache',
@@ -233,3 +245,8 @@ LOGGING = {
         },
     },
 }
+
+
+if TESTING:
+    # Testlar tezroq bo'lishi uchun
+    PASSWORD_HASHERS = ['django.contrib.auth.hashers.MD5PasswordHasher']

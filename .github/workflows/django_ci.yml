@@ -10,11 +10,20 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
+    # Maxfiy kalitlar (secrets) fork'larda bo'sh bo'ladi, shuning uchun
+    # CI uchun xavfsiz bo'lmagan, lekin faqat CI ga xos qiymatlar beriladi.
+    env:
+      SECRET_KEY: ${{ secrets.SECRET_KEY || 'ci-only-insecure-secret-key-do-not-use-in-production-0123456789' }}
+      BOT_TOKEN: ${{ secrets.BOT_TOKEN || 'dummy-bot-token-for-ci' }}
+      DEBUG: 'True'
+      ALLOWED_HOSTS: 'localhost,127.0.0.1'
+      DATABASE_URL: 'sqlite:///ci_db.sqlite3'
+
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
     - name: Python moslash
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: '3.11'
 
@@ -23,12 +32,19 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
-    - name: Testlarni yurgizish
-      env:
-        SECRET_KEY: ${{ secrets.SECRET_KEY }}
-        BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
-        GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-        DEBUG: 'True'
-        ALLOWED_HOSTS: 'localhost,127.0.0.1'
+    - name: Migratsiyalar modelga mosligini tekshirish
+      run: python manage.py makemigrations --check --dry-run
+
+    - name: Toza bazada migratsiyalarni qo'llash
+      run: python manage.py migrate --noinput
+
+    - name: Testlarni yurgizish (0 ta test topilsa FAIL)
       run: |
-        python manage.py test
+        python manage.py test apps -v 2 2>&1 | tee test_output.txt
+        # Pipe tufayli test xatosi yashirinmasligi uchun:
+        test "${PIPESTATUS[0]}" -eq 0
+        # Test topilmagan bo'lsa ("Ran 0 tests") CI yiqiladi
+        ran=$(grep -E "^Ran [0-9]+ test" test_output.txt | awk '{print $2}')
+        echo "Topilgan testlar soni: ${ran:-0}"
+        test "${ran:-0}" -gt 0
+      shell: bash

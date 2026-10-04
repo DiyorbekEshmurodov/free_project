@@ -88,9 +88,13 @@
 
                         <hr class="dropdown-divider">
 
-                        <a href="{% url 'logout_page' %}" class="dropdown-item logout-item">
-                            🚪 <span>Tizimdan chiqish</span>
-                        </a>
+                        <!-- TIZIMDAN CHIQISH FORMASI (TEST UCHUN TO'G'RILANDI) -->
+                        <form method="post" action="{% url 'logout_page' %}" style="margin: 0; padding: 0;">
+                            {% csrf_token %}
+                            <button type="submit" class="dropdown-item logout-item" style="width: 100%; border: none; background: none; text-align: left; cursor: pointer; font: inherit;">
+                                🚪 <span>Tizimdan chiqish</span>
+                            </button>
+                        </form>
                     </div>
                 </div>
             {% else %}

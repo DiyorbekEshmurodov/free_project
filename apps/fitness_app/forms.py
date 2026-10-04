@@ -1,19 +1,26 @@
-from django import forms
 from datetime import date
+
+from django import forms
+
 from .models import FitnessPlan
+
 
 class FitnessPlanForm(forms.ModelForm):
     class Meta:
         model = FitnessPlan
         fields = ['title', 'description', 'period_type', 'target_date', 'is_completed']
-        ordering =['target_date']
         widgets = {
-            'target_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
             'title': forms.TextInput(attrs={'class': 'form-control'}),
             'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
             'period_type': forms.Select(attrs={'class': 'form-control'}),
-            'type':'date',
-            'min': date.today().isoformat(),  # Bugungi kundan oldingisini taqiqlaydi
-            'lang': 'uz',
-            'class': 'form-control'
+            'target_date': forms.DateInput(
+                attrs={'type': 'date', 'class': 'form-control', 'lang': 'uz'},
+            ),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Yangi rejada o'tgan sanani brauzer darajasida taqiqlaymiz.
+        # Tahrirda eski sanani buzmaslik uchun min qo'yilmaydi.
+        if not self.instance.pk:
+            self.fields['target_date'].widget.attrs['min'] = date.today().isoformat()

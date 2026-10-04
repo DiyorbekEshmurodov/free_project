@@ -30,7 +30,7 @@ def profile_required(view_func):
 
 @login_required
 @profile_required
-def plan_list(request):
+def user_list(request):
     period = request.GET.get('period', 'daily')
     if period not in ALLOWED_PERIODS:
         period = 'daily'
@@ -46,7 +46,7 @@ def plan_list(request):
 
 @login_required
 @profile_required
-def plan_create(request):
+def user_create(request):
     form = FitnessPlanForm(request.POST or None)
     if request.method == 'POST' and form.is_valid():
         plan = form.save(commit=False)
@@ -58,7 +58,7 @@ def plan_create(request):
 
 @login_required
 @profile_required
-def plan_edit(request, pk):
+def user_edit(request, pk):
     plan = get_object_or_404(FitnessPlan, pk=pk, user=request.profile)
     form = FitnessPlanForm(request.POST or None, instance=plan)
     if request.method == 'POST' and form.is_valid():
@@ -70,7 +70,7 @@ def plan_edit(request, pk):
 @login_required
 @require_POST
 @profile_required
-def plan_delete(request, pk):
+def user_delete(request, pk):
     plan = get_object_or_404(FitnessPlan, pk=pk, user=request.profile)
     plan.delete()
     return redirect('user_list')
