@@ -1,0 +1,14 @@
+# Image ichiga tushmasligi kerak bo'lganlar (kalitlar, tarix, foydalanuvchi rasmlari)
+.git
+.gitignore
+.idea
+.vscode
+.env
+.env.*
+!.env.example
+__pycache__/
+*.pyc
+db.sqlite3
+media/
+staticfiles/
+.github

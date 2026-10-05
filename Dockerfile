@@ -13,12 +13,14 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . /app/
 
-# Fayllarni boshqarish huquqini appuser'ga o'tkazish
-RUN chown -R appuser:appuser /app
+# Docker volume'lar ulanadigan papkalar OLDINDAN yaratilib appuser'ga beriladi.
+# Aks holda volume root egaligida yaratiladi va collectstatic ruxsat xatosi beradi.
+RUN mkdir -p /app/staticfiles /app/media \
+    && chown -R appuser:appuser /app
 
 USER appuser
 
 EXPOSE 8000
 
-# Gunicorn WSGI serverini 3 ta worker bilan ishga tushirish
-CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "3", "config.wsgi:application"]
+# gthread: bitta sekin AI so'rovi butun workerni bloklamasin (3 worker x 4 oqim)
+CMD ["gunicorn", "--bind", "0.0.0.0:8000", "--workers", "3", "--worker-class", "gthread", "--threads", "4", "--timeout", "40", "config.wsgi:application"]

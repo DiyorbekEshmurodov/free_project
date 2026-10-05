@@ -1,5 +1,7 @@
+from apps.accounts.services import get_user_profile
+
+
 def user_profile_status(request):
-    from apps.accounts.services import user_has_profile
-    return {
-        'has_profile': user_has_profile(request.user)
-    }
+    # get_user_profile keshlangan (15 daqiqa), shuning uchun har sahifada
+    # qo'shimcha DB so'rovi yuborilmaydi.
+    return {'has_profile': get_user_profile(request.user) is not None}

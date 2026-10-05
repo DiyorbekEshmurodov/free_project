@@ -95,13 +95,33 @@ class PlanCrudTests(FitnessBase):
         self.assertIn('testusername', str(self.plan))
 
 
+class PaginationAndAdminTests(FitnessBase):
+    def test_list_is_paginated(self):
+        FitnessPlan.objects.bulk_create([
+            FitnessPlan(user=self.detail, title=f'P{i}', period_type='daily', target_date=date.today())
+            for i in range(24)
+        ])  # setUp dagi 1 ta bilan jami 25 ta
+        self.assertEqual(len(self.client.get(reverse('user_list')).context['plans']), 20)
+        self.assertEqual(len(self.client.get(reverse('user_list'), {'page': 2}).context['plans']), 5)
+        self.assertEqual(self.client.get(reverse('user_list'), {'page': 'abc'}).status_code, 200)
+
+    def test_has_profile_context_for_logged_in_user(self):
+        self.assertTrue(self.client.get(reverse('user_list')).context['has_profile'])
+
+    def test_admin_changelist_loads(self):
+        admin = User.objects.create_superuser('boss', 'boss@example.com', 'AdminPass123!x')
+        self.client.force_login(admin)
+        response = self.client.get(reverse('admin:fitness_app_fitnessplan_changelist'))
+        self.assertEqual(response.status_code, 200)
+
+
 class AIPageTests(FitnessBase):
     @patch('apps.fitness_app.views.ai_generate_advice', return_value=ADVICE)
     def test_ai_page_view_passes_user_for_quota(self, mock_advice):
         response = self.client.get(reverse('ai_page'), {'card': 'weight_loss', 'period': 'weekly'})
         self.assertEqual(response.status_code, 200)
         mock_advice.assert_called_once()
-        self.assertEqual(mock_advice.call_args[0][0].user.pk, self.user.pk)
+        self.assertEqual(mock_advice.call_args.kwargs['user_id'], self.user.pk)
 
     @patch('apps.fitness_app.views.ai_generate_advice', return_value=ADVICE)
     def test_invalid_query_params_fall_back_to_whitelist(self, mock_advice):

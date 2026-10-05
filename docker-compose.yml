@@ -1,4 +1,22 @@
+# Ishga tushirish:  docker compose up --build
+# Lokal (http) sinov uchun .env ga SECURE_SSL=False yozing. Productionda HTTPS (TLS) proksi ortida True qoldiring.
 services:
+  db:
+    image: postgres:16-alpine
+    container_name: lifegym_db
+    restart: always
+    environment:
+      POSTGRES_DB: ${DB_NAME:-gym_db}
+      POSTGRES_USER: ${DB_USER:-gym_admin}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD .env faylida berilishi shart}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-gym_admin} -d ${DB_NAME:-gym_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   redis:
     image: redis:7-alpine
     container_name: lifegym_redis
@@ -12,20 +30,28 @@ services:
     command: >
       sh -c "python manage.py migrate --noinput &&
              python manage.py collectstatic --noinput &&
-             gunicorn --bind 0.0.0.0:8000 --workers 3 config.wsgi:application"
+             gunicorn --bind 0.0.0.0:8000 --workers 3 --worker-class gthread --threads 4 --timeout 40 config.wsgi:application"
     volumes:
       - media_volume:/app/media
       - static_volume:/app/staticfiles
-    ports:
-      - "8000:8000"
+    expose:
+      - "8000"
     env_file:
       - .env
     environment:
       - DEBUG=0
+      - DATABASE_URL=postgres://${DB_USER:-gym_admin}:${DB_PASSWORD}@db:5432/${DB_NAME:-gym_db}
       # Umumiy kesh: login urinishlari, AI kvota va profil keshi barcha workerlarda bir xil
       - REDIS_URL=redis://redis:6379/1
+      # Oldimizda bitta ishonchli proksi (nginx) bor
+      - BEHIND_PROXY=True
+      - NUM_PROXIES=1
+      - SECURE_SSL=${SECURE_SSL:-True}
     depends_on:
-      - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
 
   bot:
     build: .
@@ -36,13 +62,27 @@ services:
       - .env
     environment:
       - DEBUG=0
+      - DATABASE_URL=postgres://${DB_USER:-gym_admin}:${DB_PASSWORD}@db:5432/${DB_NAME:-gym_db}
       - REDIS_URL=redis://redis:6379/1
     volumes:
       - media_volume:/app/media
     depends_on:
       - web
-      - redis
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: lifegym_nginx
+    restart: always
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - static_volume:/app/staticfiles:ro
+      - media_volume:/app/media:ro
+    depends_on:
+      - web
 
 volumes:
+  postgres_data:
   media_volume:
   static_volume:

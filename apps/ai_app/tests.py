@@ -135,3 +135,19 @@ class AIQuotaTests(TestCase):
         with patch('apps.ai_app.llm.get_client') as get_client:
             self.assertEqual(cached_completion('t', 'p', MSG, user_id=1), NO_KEY_MESSAGE)
             get_client.assert_not_called()
+
+
+class QuotaFailClosedTests(TestCase):
+    """R2: user_id unutilsa kvota jimgina o'chib qolmasligi kerak."""
+
+    def setUp(self):
+        cache.clear()
+
+    def test_consume_quota_without_user_raises(self):
+        from apps.ai_app.llm import consume_quota
+        with self.assertRaises(ValueError):
+            consume_quota(None)
+
+    def test_cached_completion_requires_user_id(self):
+        with self.assertRaises(TypeError):
+            cached_completion('t', 'p', MSG)  # user_id berilmagan

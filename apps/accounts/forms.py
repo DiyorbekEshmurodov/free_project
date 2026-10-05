@@ -51,6 +51,19 @@ class UserDetailForm(forms.ModelForm):
                 raise ValidationError("Vazni 20 kg va 300 kg oralig'ida bo'lishi kerak!")
         return vazni
 
+    MAX_AVATAR_BYTES = 2 * 1024 * 1024  # 2 MB
+    ALLOWED_AVATAR_EXT = ('.jpg', '.jpeg', '.png', '.webp')
+
+    def clean_avatar(self):
+        avatar = self.cleaned_data.get('avatar')
+        # Yangi fayl yuklangandagina tekshiramiz (mavjud/o'chirish holatida content_type yo'q)
+        if avatar and hasattr(avatar, 'content_type'):
+            if avatar.size > self.MAX_AVATAR_BYTES:
+                raise ValidationError("Rasm hajmi 2 MB dan oshmasligi kerak!")
+            if not avatar.name.lower().endswith(self.ALLOWED_AVATAR_EXT):
+                raise ValidationError("Faqat JPG, PNG yoki WEBP rasm yuklash mumkin!")
+        return avatar
+
     def clean_phone_number(self):
         phone = self.cleaned_data.get('phone_number')
         if phone:

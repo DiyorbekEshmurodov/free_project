@@ -1,3 +1,6 @@
+import hashlib
+import logging
+
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import authenticate, login, logout
@@ -15,7 +18,12 @@ from .services import (
     consume_login_token,
     get_user_profile,
     invalidate_user_profile_cache,
+    password_error,
+    username_error,
+    username_taken,
 )
+
+logger = logging.getLogger('security')
 
 MAX_LOGIN_ATTEMPTS = 5
 LOGIN_LOCK_SECONDS = 300
@@ -25,19 +33,24 @@ AUTO_LOGIN_MAX_AGE = 600
 def _get_client_ip(request):
     """Mijoz IP manzili.
 
-    X-Forwarded-For sarlavhasini mijoz o'zi yuborishi mumkin, shuning uchun
-    unga faqat TRUST_X_FORWARDED_FOR=True (ishonchli proksi ortida) bo'lsa
-    ishonamiz. Aks holda REMOTE_ADDR olinadi.
+    X-Forwarded-For ni mijozning o'zi ham yuborishi mumkin, shuning uchun
+    CHAPDAGI (birinchi) qiymatga ishonib bo'lmaydi. Ishonchli proksi
+    (nginx, Render) o'zi ko'rgan IP ni ro'yxatning OXIRIGA qo'shadi.
+    NUM_PROXIES = bizning oldimizdagi ishonchli proksilar soni:
+    0 - header o'qilmaydi (REMOTE_ADDR), 1 - oxirgi qiymat, 2 - oxiridan ikkinchisi.
     """
-    if getattr(settings, 'TRUST_X_FORWARDED_FOR', False):
-        forwarded = request.META.get('HTTP_X_FORWARDED_FOR')
-        if forwarded:
-            return forwarded.split(',')[0].strip()
+    num_proxies = getattr(settings, 'NUM_PROXIES', 0)
+    if num_proxies > 0:
+        parts = [p.strip() for p in request.META.get('HTTP_X_FORWARDED_FOR', '').split(',') if p.strip()]
+        if len(parts) >= num_proxies:
+            return parts[-num_proxies]
     return request.META.get('REMOTE_ADDR', 'unknown')
 
 
 def _attempts_key(request, username):
-    return f"login_attempts:{_get_client_ip(request)}:{username}"
+    # username ni hash qilamiz: kalit uzunligi cheklangan va begona belgisiz bo'ladi
+    digest = hashlib.sha256(username.lower().encode('utf-8')).hexdigest()[:32]
+    return f"login_attempts:{_get_client_ip(request)}:{digest}"
 
 
 def _too_many_login_attempts(request, username=""):
@@ -66,11 +79,13 @@ def auto_login_view(request, token):
     try:
         telegram_id = signer.unsign(token, max_age=AUTO_LOGIN_MAX_AGE)
     except (BadSignature, SignatureExpired):
+        logger.warning("auto-login rad etildi: imzo noto'g'ri yoki muddat o'tgan (ip=%s)", _get_client_ip(request))
         messages.error(request, "Kirish havolasining vaqti o'tgan yoki havola noto'g'ri!")
         return redirect('login_page')
 
     # Bir martalik kafolat umumiy ombor (DB) orqali - barcha workerlarda ishlaydi
     if not consume_login_token(token):
+        logger.warning("auto-login rad etildi: token qayta ishlatildi (ip=%s)", _get_client_ip(request))
         messages.error(request, "Ushbu kirish havolasidan allaqachon foydalanilgan!")
         return redirect('login_page')
 
@@ -122,6 +137,7 @@ def login_page(request):
 
         if action_type == 'login':
             if _too_many_login_attempts(request, username):
+                logger.warning("login bloklandi: juda ko'p urinish (ip=%s)", _get_client_ip(request))
                 messages.error(request, "Juda ko'p noto'g'ri urinish qilindi. 5 daqiqadan so'ng qayta urinib ko'ring.")
                 return render(request, 'accounts/login.html')
 
@@ -131,6 +147,7 @@ def login_page(request):
                 login(request, user)
                 return redirect('index')
             _register_failed_login_attempt(request, username)
+            logger.info("login muvaffaqiyatsiz (ip=%s)", _get_client_ip(request))
             return render(request, 'accounts/login.html', {'error': "Username yoki parol xato kiritilgan!"})
 
         elif action_type == 'register':
@@ -143,9 +160,11 @@ def login_page(request):
             elif len(password) < 8 or not has_upper or not has_lower:
                 messages.error(request,
                                "Parol kamida 8 ta belgi, 1 ta katta va 1 ta kichik harfdan iborat bo'lishi kerak!")
-            elif not username:
-                messages.error(request, 'Username kiritilishi shart!')
-            elif User.objects.filter(username=username).exists():
+            elif username_error(username):
+                messages.error(request, username_error(username))
+            elif password_error(password):
+                messages.error(request, password_error(password))
+            elif username_taken(username):
                 messages.error(request, 'Bunday foydalanuvchi allaqachon mavjud!')
             else:
                 try:

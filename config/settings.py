@@ -34,15 +34,16 @@ SITE_URL = config('SITE_URL', default='https://lifegym-kapp.onrender.com')
 
 # Ishonchli proksi (Render, nginx) ortida ishlayotgan bo'lsa True qiling
 BEHIND_PROXY = config('BEHIND_PROXY', default=False, cast=bool)
-TRUST_X_FORWARDED_FOR = BEHIND_PROXY
+# Bizning oldimizdagi ishonchli proksilar soni (IP ni X-Forwarded-For ning
+# OXIRIDAN olish uchun). Proksi bo'lmasa 0: header umuman o'qilmaydi.
+NUM_PROXIES = config('NUM_PROXIES', default=1 if BEHIND_PROXY else 0, cast=int)
 if BEHIND_PROXY:
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 # Hostlar ro'yxati
-ALLOWED_HOSTS = config(
-    'ALLOWED_HOSTS',
-    default='127.0.0.1,localhost,zippy-upon-unscathed.ngrok-free.dev'
-).split(',')
+ALLOWED_HOSTS = [
+    h.strip() for h in config('ALLOWED_HOSTS', default='127.0.0.1,localhost').split(',') if h.strip()
+]
 
 
 # Application definition
@@ -186,10 +187,11 @@ if not DEBUG and not TESTING:
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
 
+# Shaxsiy domenlar (ngrok va h.k.) kodga yozilmaydi, .env orqali beriladi
 CSRF_TRUSTED_ORIGINS = [
-    'https://zippy-upon-unscathed.ngrok-free.dev',
-    'http://127.0.0.1:8000',
-    'http://localhost:8000',
+    o.strip() for o in config(
+        'CSRF_TRUSTED_ORIGINS', default='http://127.0.0.1:8000,http://localhost:8000'
+    ).split(',') if o.strip()
 ]
 
 LOGIN_URL = 'login_page'
@@ -215,6 +217,13 @@ else:
             'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
         }
     }
+    if not DEBUG and not TESTING:
+        import warnings
+        warnings.warn(
+            "REDIS_URL berilmagan: kesh har bir Gunicorn workerida alohida. "
+            "Login limiti, AI kvota va kesh noto'g'ri sanaladi. Productionda Redis ishlating.",
+            RuntimeWarning,
+        )
 
 
 # Logging Sozlamasi
@@ -238,6 +247,11 @@ LOGGING = {
         'level': 'INFO',
     },
     'loggers': {
+        'security': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': False,
+        },
         'django': {
             'handlers': ['console'],
             'level': 'WARNING',

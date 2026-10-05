@@ -66,6 +66,18 @@
                     </tbody>
                 </table>
             </div>
+
+            {% if page_obj.has_other_pages %}
+            <div style="display:flex; gap:12px; justify-content:center; align-items:center; padding:16px;">
+                {% if page_obj.has_previous %}
+                    <a href="?period={{ period }}&page={{ page_obj.previous_page_number }}" class="item">&larr; Oldingi</a>
+                {% endif %}
+                <span style="color: var(--text-muted);">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+                {% if page_obj.has_next %}
+                    <a href="?period={{ period }}&page={{ page_obj.next_page_number }}" class="item">Keyingi &rarr;</a>
+                {% endif %}
+            </div>
+            {% endif %}
         </div>
     </div>
 </div>

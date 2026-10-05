@@ -24,7 +24,7 @@ QUOTA_MESSAGE = "Bugungi AI so'rovlar limiti tugadi. Iltimos, ertaga qayta urini
 @lru_cache(maxsize=1)
 def get_client():
     from groq import Groq  # lazy import: kalit/kutubxona yo'q bo'lsa ilova qulamaydi
-    return Groq(api_key=settings.GROQ_API_KEY, timeout=8.0, max_retries=1)
+    return Groq(api_key=settings.GROQ_API_KEY, timeout=8.0, max_retries=0)
 
 
 def _daily_limit() -> int:
@@ -35,11 +35,12 @@ def consume_quota(user_id) -> bool:
     """Foydalanuvchining kunlik AI kvotasidan 1 ta ishlatadi.
 
     True  - ruxsat bor. False - limit tugagan (model chaqirilmaydi).
+    user_id YO'Q bo'lsa ValueError: kvota jimgina o'chib qolmasin.
     Kvota keshda saqlanadi: ko'p workerli deployda REDIS_URL kerak
     (umumiy kesh bo'lmasa har bir worker alohida sanaydi).
     """
     if user_id is None:
-        return True
+        raise ValueError("consume_quota: user_id majburiy (kvota o'chib qolmasligi uchun)")
     key = f"ai_quota:{user_id}:{date.today().isoformat()}"
     cache.add(key, 0, timeout=60 * 60 * 25)
     try:
@@ -50,7 +51,7 @@ def consume_quota(user_id) -> bool:
     return used <= _daily_limit()
 
 
-def cached_completion(namespace, payload, messages, user_id=None,
+def cached_completion(namespace, payload, messages, *, user_id,
                       ttl=60 * 60 * 24, **kwargs):
     """Keshlangan LLM javobi.
 

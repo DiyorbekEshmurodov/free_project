@@ -1,5 +1,7 @@
-import os
+import html
 import logging
+import os
+
 import django
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
@@ -14,10 +16,15 @@ from aiogram.fsm.context import FSMContext
 
 
 from django.conf import settings
-from django.contrib.auth.models import User
 from django.core.signing import TimestampSigner
 from apps.accounts.models import UserDetail
-from apps.accounts.services import UsernameTakenError, register_telegram_user
+from apps.accounts.services import (
+    UsernameTakenError,
+    password_error,
+    register_telegram_user,
+    username_error,
+    username_taken,
+)
 from . import globals
 from .states import LoginStates
 
@@ -46,7 +53,14 @@ def get_user_detail(telegram_id):
 
 @sync_to_async
 def check_username_exists(username):
-    return User.objects.filter(username=username).exists()
+    # 'Ali' va 'ali' bir xil hisoblanadi
+    return username_taken(username)
+
+
+@sync_to_async
+def check_password_error(password):
+    # Django parol validatorlari fayl o'qiydi, shuning uchun sync_to_async ichida
+    return password_error(password)
 
 
 @sync_to_async
@@ -106,8 +120,9 @@ async def phone_number(message: types.Message, state: FSMContext):
 @main_router.message(LoginStates.username, F.text)
 async def process_username(message: types.Message, state: FSMContext):
     username = message.text.strip()
-    if not username:
-        await message.answer("Login bo'sh bo'lishi mumkin emas. Iltimos, login kiriting:")
+    problem = username_error(username)
+    if problem:
+        await message.answer(f"{problem} Iltimos, boshqa login kiriting:")
         return
     is_exists = await check_username_exists(username)
     if is_exists:
@@ -134,6 +149,11 @@ async def process_password(message: types.Message, state: FSMContext):
         )
         return
 
+    weak = await check_password_error(password)
+    if weak:
+        await message.answer(f"❌ {weak}\n\nIltimos, boshqa parol kiriting:")
+        return
+
     data = await state.get_data()
     telegram_id = message.from_user.id
     username_input = data.get('username')
@@ -154,11 +174,11 @@ async def process_password(message: types.Message, state: FSMContext):
         )
 
         await message.answer(
-            f"✅ **Muvaffaqiyatli saqlandi!**\n\n"
-            f"🔑 **Loginingiz:** `{username_input}`\n\n"
-            f"🔒 Parolingiz saqlandi. Saytga kirishda ushbu ma'lumotlardan foydalaning.",
+            "✅ <b>Muvaffaqiyatli saqlandi!</b>\n\n"
+            f"🔑 <b>Loginingiz:</b> <code>{html.escape(username_input)}</code>\n\n"
+            "🔒 Parolingiz saqlandi. Saytga kirishda ushbu ma'lumotlardan foydalaning.",
             reply_markup=buttons,
-            parse_mode="Markdown"
+            parse_mode="HTML"
         )
 
     except UsernameTakenError:

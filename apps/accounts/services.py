@@ -8,7 +8,10 @@ import hashlib
 from datetime import timedelta
 
 from django.contrib.auth.models import User
+from django.contrib.auth.password_validation import validate_password
+from django.contrib.auth.validators import UnicodeUsernameValidator
 from django.core.cache import cache
+from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.db.models import Q
 from django.utils import timezone
@@ -21,6 +24,36 @@ TOKEN_RETENTION = timedelta(days=1)
 
 class UsernameTakenError(Exception):
     """Tanlangan username band: mavjud hisobga hech narsa bog'lanmaydi."""
+
+
+_username_validator = UnicodeUsernameValidator()
+
+
+def username_taken(username: str) -> bool:
+    """Registrga e'tibor bermasdan tekshiradi: 'Ali' va 'ali' bir xil hisoblanadi."""
+    return User.objects.filter(username__iexact=username).exists()
+
+
+def username_error(username: str):
+    """Username noto'g'ri bo'lsa xabar qaytaradi, to'g'ri bo'lsa None."""
+    if not username:
+        return "Login bo'sh bo'lishi mumkin emas."
+    if len(username) > 150:
+        return "Login 150 belgidan oshmasligi kerak."
+    try:
+        _username_validator(username)
+    except ValidationError:
+        return "Loginda faqat harf, raqam va @ . + - _ belgilari bo'lishi mumkin."
+    return None
+
+
+def password_error(password: str):
+    """Parol Django validatorlaridan o'tmasa birinchi xabarni qaytaradi."""
+    try:
+        validate_password(password)
+    except ValidationError as exc:
+        return exc.messages[0]
+    return None
 
 
 def get_user_profile(user):
@@ -94,6 +127,9 @@ def register_telegram_user(telegram_id, username, password, data):
             user.last_name = data.get('last_name', user.last_name)
             user.save(update_fields=['first_name', 'last_name'])
         else:
+            # 'Victim' va 'victim' ni ham bir xil deb hisoblaymiz (chalg'itib bo'lmasin)
+            if username_taken(username):
+                raise UsernameTakenError(username)
             try:
                 # Ichki atomic = savepoint: IntegrityError tashqi tranzaksiyani buzmaydi
                 with transaction.atomic():

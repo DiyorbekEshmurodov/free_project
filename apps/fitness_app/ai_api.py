@@ -59,7 +59,7 @@ def _parse_advice(raw):
     return {k: data[k] for k in ADVICE_KEYS}
 
 
-def generate_user_advice(profile, card_id, period, user_id=None):
+def generate_user_advice(profile, card_id, period, *, user_id):
     """Groq orqali maslahat oladi (kesh + kunlik kvota bilan).
 
     Natija JSON bo'lmasa, kalit yo'q bo'lsa yoki limit tugasa model

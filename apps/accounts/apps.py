@@ -1,7 +1,3 @@
-import os
-import sys
-import threading
-import asyncio
 from django.apps import AppConfig
 
 

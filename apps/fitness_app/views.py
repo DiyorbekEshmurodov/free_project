@@ -1,4 +1,5 @@
 from functools import wraps
+from django.core.paginator import Paginator
 from django.shortcuts import render, redirect, get_object_or_404
 from django.views.generic import TemplateView
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -12,6 +13,7 @@ from .ai_api import generate_user_advice as ai_generate_advice
 # GET parametrlarini tekshirish uchun oq ro'yxat (Whitelist - B6 himoyasi)
 ALLOWED_CARDS = {'weight_loss', 'muscle_gain', 'stamina', 'health_habits'}
 ALLOWED_PERIODS = {'daily', 'weekly', 'monthly', 'yearly'}
+PLANS_PER_PAGE = 20
 
 
 def profile_required(view_func):
@@ -35,10 +37,13 @@ def user_list(request):
     if period not in ALLOWED_PERIODS:
         period = 'daily'
 
-    plans = FitnessPlan.objects.filter(user=request.profile, period_type=period).order_by('target_date')
+    plans = FitnessPlan.objects.filter(user=request.profile, period_type=period).order_by('target_date', 'pk')
+    # Sahifalash: minglab reja bo'lsa ham sahifa sekinlashmaydi
+    page_obj = Paginator(plans, PLANS_PER_PAGE).get_page(request.GET.get('page'))
 
     ctx = {
-        'plans': plans,
+        'plans': page_obj,
+        'page_obj': page_obj,
         'period': period
     }
     return render(request, "fitness_app/list.html", ctx)
@@ -107,7 +112,7 @@ class AIReportView(LoginRequiredMixin, TemplateView):
         ]
         context['cards'] = cards
         # dispatch'da olingan profilni qayta ishlatamiz (C2 optimizatsiya)
-        profil = getattr(self.request, 'profile', get_user_profile(self.request.user))
+        profil = self.request.profile  # dispatch() har doim qo'yadi
         context['profil'] = profil
         context['has_profile'] = profil is not None
 
@@ -126,7 +131,7 @@ class AIPageDetailView(LoginRequiredMixin, TemplateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        profile = getattr(self.request, 'profile', get_user_profile(self.request.user))
+        profile = self.request.profile  # dispatch() har doim qo'yadi
 
         # Parametrlarni oq ro'yxat orqali xavfsiz saralash (B6 himoyasi)
         card_param = self.request.GET.get('card')
@@ -144,7 +149,9 @@ class AIPageDetailView(LoginRequiredMixin, TemplateView):
         period_label = period_titles.get(selected_period, 'Haftalik')
 
         # Groq AI maslahatini olish
-        advice_data = ai_generate_advice(profile, selected_card, selected_period)
+        advice_data = ai_generate_advice(
+            profile, selected_card, selected_period, user_id=self.request.user.id,
+        )
 
         # Diagramma ma'lumotlari
         chart_data = self.get_chart_data(selected_period, selected_card)
